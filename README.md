@@ -1,5 +1,8 @@
 # Sovel public updates
 
+Desktop update `0.1.0-3` adds the AIC8800 driver as a dependency, so updating an
+older Sovel installation also installs the driver and matching firmware.
+
 The repository also includes `sovel-aic8800-dkms`, with matched firmware and
 source for automatic rebuilds after kernel updates. It targets AIC8800 USB
 adapters, including the user's Foxtec AX900 (`368b:8d81`). The pinned source is
