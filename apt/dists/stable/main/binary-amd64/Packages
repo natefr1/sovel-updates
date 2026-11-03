@@ -4,66 +4,78 @@ Architecture: all
 Maintainer: Sovel Public Updates
 Depends: dkms (>= 3), linux-headers-generic, gcc, make, eject, usb-modeswitch, kmod
 Conflicts: aic8800-dkms
-Section: kernel
-Priority: optional
-Description: AIC8800 USB Wi-Fi driver and matching firmware for Sovel
- Includes source for automatic rebuilds after kernel updates, USB mode-switch
- rules, and the device-scoped 368b:8d81 Bluetooth companion module.
 Filename: pool/main/s/sovel-aic8800-dkms/sovel-aic8800-dkms_1.0.0+git2e75f888-1_all.deb
 Size: 2129028
 MD5sum: aecb72b2efc751e1e22d62861f3d4bcb
 SHA1: 584be53f9220bdda0b625733a63ae84627e209f9
 SHA256: 7ae6d3ab96c1e6ae3cbcf7bdb87eb57fd2ba97831ff4634a56056187a2e8e589
-SHA512: 37be3de57b6bc3ecc35a56353343f11c455af209b4352b0ac515fd2282f35b45130f701729930b1adf221bbd282776020e828d0a0c7a9c1b32b2d823f345d5c4
+Section: kernel
+Priority: optional
+Description: AIC8800 USB Wi-Fi driver and matching firmware for Sovel
+ Includes source for automatic rebuilds after kernel updates, USB mode-switch
+ rules, and the device-scoped 368b:8d81 Bluetooth companion module.
 
 Package: sovel-desktop
 Version: 0.1.0-1
 Architecture: amd64
 Maintainer: Sovel Release Team
-Section: x11
-Priority: optional
 Installed-Size: 20052
 Depends: libc6 (>= 2.34), libgcc-s1 (>= 3.0), liblayershellqtinterface6 (>= 6.1.0), libpackagekitqt6-2 (>= 1.1.1), libqt6core6t64 (>= 6.10.2), libqt6dbus6 (>= 6.8.2), libqt6gui6 (>= 6.4.0), libqt6network6 (>= 6.1.2), libqt6qml6 (>= 6.6.0), libqt6quick6 (>= 6.6.0), libstdc++6 (>= 5), libwayland-client0 (>= 1.20.0), labwc, cage, greetd, gtklock, foot, resources, packagekit, network-manager, network-manager-applet, bluez, blueman, lxqt-policykit, xwayland, python3, qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-window, qml6-module-qtqml-workerscript, qml6-module-qtquick-effects, qt6-wayland, qt6-svg-plugins
-Description: Sovel desktop, Settings and system integration
- The public Sovel desktop with signed system updates in Settings.
 Filename: pool/main/s/sovel-desktop/sovel-desktop_0.1.0-1_amd64.deb
 Size: 9563484
 MD5sum: 7ad834fd50320571736e5c4b607aa229
 SHA1: f2f2326e55e0d7e18e9454afdaef0ec4f9b4ce63
 SHA256: b7cc61f1a6531abde1272afbb5bbd302f32841d08d57625fd5030438124baee4
-SHA512: b2f456a7b9a54ae32340f3f3af05af84ee9f66240696f40ab1ae77a2c245703eb292d38d2430b68d3f324e2c496365802ead1e0111d830cd688a1e21b500580b
+Section: x11
+Priority: optional
+Description: Sovel desktop, Settings and system integration
+ The public Sovel desktop with signed system updates in Settings.
 
 Package: sovel-desktop
 Version: 0.1.0-2
 Architecture: amd64
 Maintainer: Sovel Release Team
-Section: x11
-Priority: optional
 Installed-Size: 7292
 Depends: libc6 (>= 2.34), libgcc-s1 (>= 3.0), liblayershellqtinterface6 (>= 6.1.0), libpackagekitqt6-2 (>= 1.1.1), libqt6core6t64 (>= 6.10.2), libqt6dbus6 (>= 6.8.2), libqt6gui6 (>= 6.4.0), libqt6network6 (>= 6.1.2), libqt6qml6 (>= 6.6.0), libqt6quick6 (>= 6.6.0), libstdc++6 (>= 5), libwayland-client0 (>= 1.20.0), labwc, cage, greetd, gtklock, foot, resources, packagekit, network-manager, network-manager-applet, bluez, blueman, lxqt-policykit, xwayland, python3, qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-window, qml6-module-qtqml-workerscript, qml6-module-qtquick-effects, qt6-wayland, qt6-svg-plugins
-Description: Sovel desktop, Settings and system integration
- The public Sovel desktop with signed system updates in Settings.
 Filename: pool/main/s/sovel-desktop/sovel-desktop_0.1.0-2_amd64.deb
 Size: 4421642
 MD5sum: e166dcc8a543fd2208ab067da89f3335
 SHA1: 7153a4c9366612c2f3ed125ea3db58d2ac97eb9e
 SHA256: bdd526c991b3286c6f91d7c6b5006f46cdc4125945092478a100ee88d3a9b86b
-SHA512: fb33ed90717ea312a65712ef05ae79710cccc0b1407b711a665cad88c59e5e31d1bf367daed22b0e48f43efa8671b7f5ea560973cad274a6b25a08eb3023f1e3
+Section: x11
+Priority: optional
+Description: Sovel desktop, Settings and system integration
+ The public Sovel desktop with signed system updates in Settings.
 
 Package: sovel-desktop
 Version: 0.1.0-3
 Architecture: amd64
 Maintainer: Sovel Release Team
-Section: x11
-Priority: optional
 Installed-Size: 7292
 Depends: libc6 (>= 2.34), libgcc-s1 (>= 3.0), liblayershellqtinterface6 (>= 6.1.0), libpackagekitqt6-2 (>= 1.1.1), libqt6core6t64 (>= 6.10.2), libqt6dbus6 (>= 6.8.2), libqt6gui6 (>= 6.4.0), libqt6network6 (>= 6.1.2), libqt6qml6 (>= 6.6.0), libqt6quick6 (>= 6.6.0), libstdc++6 (>= 5), libwayland-client0 (>= 1.20.0), sovel-aic8800-dkms (>= 1.0.0+git2e75f888-1), labwc, cage, greetd, gtklock, foot, resources, packagekit, network-manager, network-manager-applet, bluez, blueman, lxqt-policykit, xwayland, python3, qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-window, qml6-module-qtqml-workerscript, qml6-module-qtquick-effects, qt6-wayland, qt6-svg-plugins
-Description: Sovel desktop, Settings and system integration
- The public Sovel desktop with signed system updates in Settings.
 Filename: pool/main/s/sovel-desktop/sovel-desktop_0.1.0-3_amd64.deb
 Size: 4421860
 MD5sum: ff3508a0994c776bd62c36cff61969cd
 SHA1: eaf893dd76e733e5fa6f4030b3a86607cfd59ac0
 SHA256: 27a084fa864db144443eb1deca1be5b7dcd9aa2d742988129cecf8d8e2e6d50e
-SHA512: af7fbb8e303fac0743ad7bd18ad0713b41f73a352b80e78b09e8a25d55154ab0fd374de3a981490aac156a811cee53ffd79262fcc7e253795388aaf57b7b29ce
+Section: x11
+Priority: optional
+Description: Sovel desktop, Settings and system integration
+ The public Sovel desktop with signed system updates in Settings.
+
+Package: sovel-desktop
+Version: 0.1.0-4
+Architecture: amd64
+Maintainer: Sovel Release Team
+Installed-Size: 7436
+Depends: libc6 (>= 2.34), libgcc-s1 (>= 3.0), liblayershellqtinterface6 (>= 6.1.0), libpackagekitqt6-2 (>= 1.1.1), libqt6core6t64 (>= 6.10.2), libqt6dbus6 (>= 6.8.2), libqt6gui6 (>= 6.4.0), libqt6network6 (>= 6.7.2), libqt6qml6 (>= 6.6.0), libqt6quick6 (>= 6.6.0), libstdc++6 (>= 14), libwayland-client0 (>= 1.20.0), sovel-aic8800-dkms (>= 1.0.0+git2e75f888-1), labwc, cage, greetd, gtklock, foot, resources, packagekit, network-manager, network-manager-applet, bluez, blueman, lxqt-policykit, xwayland, python3, flatpak, ca-certificates, qml6-module-qtmultimedia, qml6-module-qtquick-dialogs, qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-window, qml6-module-qtqml-workerscript, qml6-module-qtquick-effects, qt6-wayland, qt6-svg-plugins
+Filename: pool/main/s/sovel-desktop/sovel-desktop_0.1.0-4_amd64.deb
+Size: 4477378
+MD5sum: 686ae9b7af4fcf544054cac74c946e86
+SHA1: dd1d967e7884c2a42d44710ea4827d3f4b149488
+SHA256: 45dcdd866348f59a7e307f5cd817e32d0b151e53c48ff94a129660fac9f31952
+Section: x11
+Priority: optional
+Description: Sovel desktop, Settings and system integration
+ The public Sovel desktop with signed system updates in Settings.
 

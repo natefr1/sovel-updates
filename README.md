@@ -1,6 +1,13 @@
 # Sovel public updates
 
-Desktop update `0.1.0-3` adds the AIC8800 driver as a dependency, so updating an
+Desktop update `0.1.0-4` adds the redesigned Store with browsable collections,
+publisher screenshots, app detail pages and Install/Open actions. It also adds
+Motion Wallpapers for aurora animations and looping local video backgrounds,
+coalesces Wi-Fi scan notifications and handles desktop output reconnection.
+The reported GTX 1070 hard lockup and physical USB Wi-Fi operation still need
+hardware verification; this release does not claim those are resolved.
+
+Desktop update `0.1.0-3` added the AIC8800 driver as a dependency, so updating an
 older Sovel installation also installs the driver and matching firmware.
 
 The repository also includes `sovel-aic8800-dkms`, with matched firmware and
