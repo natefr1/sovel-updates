@@ -1,3 +1,21 @@
+Package: sovel-aic8800-dkms
+Version: 1.0.0+git2e75f888-1
+Architecture: all
+Maintainer: Sovel Public Updates
+Depends: dkms (>= 3), linux-headers-generic, gcc, make, eject, usb-modeswitch, kmod
+Conflicts: aic8800-dkms
+Section: kernel
+Priority: optional
+Description: AIC8800 USB Wi-Fi driver and matching firmware for Sovel
+ Includes source for automatic rebuilds after kernel updates, USB mode-switch
+ rules, and the device-scoped 368b:8d81 Bluetooth companion module.
+Filename: pool/main/s/sovel-aic8800-dkms/sovel-aic8800-dkms_1.0.0+git2e75f888-1_all.deb
+Size: 2129028
+MD5sum: aecb72b2efc751e1e22d62861f3d4bcb
+SHA1: 584be53f9220bdda0b625733a63ae84627e209f9
+SHA256: 7ae6d3ab96c1e6ae3cbcf7bdb87eb57fd2ba97831ff4634a56056187a2e8e589
+SHA512: 37be3de57b6bc3ecc35a56353343f11c455af209b4352b0ac515fd2282f35b45130f701729930b1adf221bbd282776020e828d0a0c7a9c1b32b2d823f345d5c4
+
 Package: sovel-desktop
 Version: 0.1.0-1
 Architecture: amd64

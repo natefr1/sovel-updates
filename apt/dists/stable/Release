@@ -2,15 +2,15 @@ Origin: Sovel
 Label: Sovel Public Updates
 Suite: stable
 Codename: stable
-Date: Tue, 03 Nov 2026 04:25:45 GMT
-Valid-Until: Thu, 03 Dec 2026 04:25:45 GMT
+Date: Tue, 03 Nov 2026 09:14:47 GMT
+Valid-Until: Thu, 03 Dec 2026 09:14:47 GMT
 Architectures: amd64
 Components: main
-Description: Signed Sovel public desktop updates
+Description: Signed Sovel public system updates
 Acquire-By-Hash: yes
 SHA256:
- c31be34e0d9441450136202e9151890af37e3ba734b4776c362e6a09dc530edc             2633 main/binary-amd64/Packages
- 056e080cef28f4305840cdad67ea8ed8b4f2ebc5637c6b0b7e9bc4c8899e5b86              955 main/binary-amd64/Packages.gz
+ f8b4111160410cca305e617b3318a3094c918a8a1886910d493c5a3d4bb10e98             3501 main/binary-amd64/Packages
+ 65dab9042260cb2da38e45d16b5702d8559b485df7746dc6f899f36b3b8aa7db             1382 main/binary-amd64/Packages.gz
 SHA512:
- d9ff79b66f5874b7fb66e27b7b4778c0c8867b02df6ea0f892c7b56f141cf1c2a866afa3d9acba557156e006853188e3225f5e670ebc7fa20a03d180f04a7f41             2633 main/binary-amd64/Packages
- 9d64bfa71658fbe04342a3a052a6bddaad67925aac779b5015c65d229cc806aa5945032606bee42a01fad98406ae194cb8b56ce81c19f9e0d9ae5da45e261fa7              955 main/binary-amd64/Packages.gz
+ ff79019b6ddd3d6e21d21b4c255accc22fc9eef08f29ec1dafa5e78c57a95f4afe861b7e20f01a6a13b3bdfebbfc9586f46ecc24c4f888e8c77bb5629f27bb16             3501 main/binary-amd64/Packages
+ f988a8c8ef4478d5a52527dcfcca69f0b7fc72322b39eecb88cfa4512f99459f336927f4ed8748c12be7652daea6f9a8cd5624d1596240eb9ea0b8ed45850721             1382 main/binary-amd64/Packages.gz
