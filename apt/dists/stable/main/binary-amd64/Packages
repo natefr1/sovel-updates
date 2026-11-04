@@ -101,6 +101,23 @@ SHA1: 94a681a98312d11040d26fe03412034b592fea4b
 SHA256: 4786674c9f3204f53de364a2b967f16475815cec9a9051f99363892d2b5ca274
 SHA512: 75a1c1c6190a221adc9fb76247d739ec70be5c2ccaea198ac64cb19ea6431a89c03d3ec63daa052ff29b7b99d7089f423f528b5fad98325740e2e35faaa34be1
 
+Package: sovel-desktop
+Version: 0.1.0-6
+Architecture: amd64
+Maintainer: Sovel Release Team
+Section: x11
+Priority: optional
+Installed-Size: 7676
+Depends: libc6 (>= 2.34), libgcc-s1 (>= 3.0), liblayershellqtinterface6 (>= 6.1.0), libpackagekitqt6-2 (>= 1.1.1), libqt6core6t64 (>= 6.10.2), libqt6dbus6 (>= 6.8.2), libqt6gui6 (>= 6.4.0), libqt6network6 (>= 6.7.2), libqt6qml6 (>= 6.6.0), libqt6quick6 (>= 6.6.0), libstdc++6 (>= 14), libwayland-client0 (>= 1.20.0), sovel-wallpaper-tools (>= 2.9+mpv1.9-1), sovel-aic8800-dkms (>= 1.0.0+git2e75f888-1), labwc, cage, greetd, gtklock, foot, resources, packagekit, network-manager, network-manager-applet, bluez, blueman, lxqt-policykit, xwayland, python3, flatpak, ca-certificates, qml6-module-qtquick-dialogs, qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-window, qml6-module-qtqml-workerscript, qml6-module-qtquick-effects, qt6-wayland, qt6-svg-plugins, qt6-image-formats-plugins, coreutils, libglib2.0-bin, xdg-utils, xdg-user-dirs, grim, slurp, wl-clipboard, libnotify-bin, mako-notifier, pipewire, pipewire-pulse, pulseaudio-utils, wireplumber, xdg-desktop-portal, xdg-desktop-portal-wlr, xdg-desktop-portal-gtk, fonts-noto-core, fonts-noto-extra, fonts-noto-cjk, fonts-noto-color-emoji, fcitx5, fcitx5-frontend-qt6, fcitx5-frontend-gtk3, fcitx5-frontend-gtk4, fcitx5-mozc, fcitx5-chinese-addons, fcitx5-hangul, fcitx5-m17n, fcitx5-config-qt
+Description: Sovel desktop, Settings and system integration
+ The public Sovel desktop with signed system updates in Settings.
+Filename: pool/main/s/sovel-desktop/sovel-desktop_0.1.0-6_amd64.deb
+Size: 4559200
+MD5sum: cbe1814900d9b2d705637fb5ac194aca
+SHA1: 3c176b976780c06f6416626742785511a87dfcd4
+SHA256: c18734ba805955f3793548dd85b378ccff874af321b8897eae526b6e79f9d289
+SHA512: 06988d994b098fed242f54dbfb036b266d483ad70523c318dcda207dd281aebcb448894da4587a018ca42f5f28b47289f37bece069760ed10b362f26304a53ba
+
 Package: sovel-wallpaper-tools
 Version: 2.9+mpv1.9-1
 Architecture: amd64

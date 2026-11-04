@@ -1,5 +1,11 @@
 # Sovel public updates
 
+Desktop update `0.1.0-6` adds coordinated translucent menus, a fluid dock,
+improved app icons, multilingual fonts/input, Win+Shift+S screenshots, a local
+wallpaper image picker and PipeWire capture/voice configuration. Store keeps all
+previous listings and adds Discord, Vesktop and Hidamari. See
+[release notes](releases/0.1.0-6.md) for usage, validation and current compositor limits.
+
 Desktop update `0.1.0-5` adds the redesigned Files app, persistent dock pinning
 and drag reordering, same-window minimize/restore, and a reviewed installer for
 downloaded `.deb` packages. External Waypaper and mpvpaper replace the built-in
