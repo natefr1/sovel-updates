@@ -1,5 +1,10 @@
 # Sovel public updates
 
+Desktop update `0.1.0-7` adds the Sound revamp, local Mini JARED,
+reliable bar/dock activation controls, Bluetooth friendly names and a monthly
+calendar. All 23 Store listings and the greeter are preserved. See
+[release notes](releases/0.1.0-7.md) for model download, usage, validation and limits.
+
 Desktop update `0.1.0-6` adds coordinated translucent menus, a fluid dock,
 improved app icons, multilingual fonts/input, Win+Shift+S screenshots, a local
 wallpaper image picker and PipeWire capture/voice configuration. Store keeps all
