@@ -135,6 +135,24 @@ SHA1: 8f4c8ac8f0c16bee0b47d84967dc0014fca64033
 SHA256: e9a9676eab8029fae73a5c4fc2638cf53bad0e78653fd29a55353824de39c01f
 SHA512: 8ac82a3737f21adb09a837422263f4de50c655af12200aef156e189e01f80ad49358021b0caab0f5a343c6e5e64084ced45e6791fc1b13cbd77d31c4d513ad79
 
+Package: sovel-desktop
+X-Sovel-Release-Info: eyJ2ZXJzaW9uIjoiMC4xLjAtOCIsIm5hbWUiOiJIb3Jpem9uIiwidHlwZSI6IkZlYXR1cmUgdXBkYXRlIiwiaWNvbiI6InNvdmVsLXNldHRpbmdzIiwiY2hhbm5lbCI6InB1YmxpYyIsIm5vdGVzIjpbIkdyb3VwZWQgU2V0dGluZ3Mgd2l0aCBzZWFyY2hhYmxlIHBhZ2VzLCBsb2NhbCBhcHBlYXJhbmNlIHByb2ZpbGVzIGFuZCByZWFsIGRldmljZSBjb250cm9scy4iLCJOZWFyYnksIHNhdmVkIGFuZCBoaWRkZW4gV2ktRmkgcHJvZmlsZXMgd2l0aCBib3VuZGVkIHNjYW4gYW5kIGNvbm5lY3Rpb24gc3RhdHVzLiIsIkNvbmZpZ3VyYWJsZSBtZW51LWJhciBzdGF0dXMgaWNvbnMsIGFycmFuZ2VtZW50IGFuZCBxdWljayBjb250cm9scy4iLCJSZWxlYXNlIGRldGFpbHMsIHNpZ25lZCBwdWJsaWNhdGlvbiBtZXRhZGF0YSBhbmQgc2VwYXJhdGUgYnVpbGQsIGRvd25sb2FkIGFuZCBpbnN0YWxsYXRpb24gdGltZXN0YW1wcy4iLCJGb3VydGVlbiBhZGRpdGlvbmFsIFN0b3JlIGxpc3RpbmdzIGFuZCBiYWNrZ3JvdW5kIGluc3RhbGxhdGlvbiBwcm9ncmVzcywgY2FuY2VsbGF0aW9uIGFuZCByZXRyeS4iLCJDb25maWd1cmFibGUgZGVza3RvcCB3aWRnZXRzIHdpdGggcGVyc2lzdGVudCBsb2NhbCBjb250ZW50LCByZWFsIHRlbGVtZXRyeSBhbmQgb3B0LWluIHdlYXRoZXIuIl0sImJ1aWx0QXQiOiIyMDI2LTExLTA0VDIxOjQ2OjQ2KzAwOjAwIiwicHVibGlzaGVkQXQiOiIyMDI2LTExLTA0VDIxOjQ5OjI1KzAwOjAwIn0=
+Version: 0.1.0-8
+Architecture: amd64
+Maintainer: Sovel Release Team
+Section: x11
+Priority: optional
+Installed-Size: 8716
+Depends: libc6 (>= 2.34), libgcc-s1 (>= 3.0), liblayershellqtinterface6 (>= 6.1.0), libpackagekitqt6-2 (>= 1.1.1), libqt6core6t64 (>= 6.10.2), libqt6dbus6 (>= 6.8.2), libqt6gui6 (>= 6.4.0), libqt6network6 (>= 6.7.2), libqt6qml6 (>= 6.6.0), libqt6quick6 (>= 6.6.0), libstdc++6 (>= 14), libwayland-client0 (>= 1.20.0), sovel-wallpaper-tools (>= 2.9+mpv1.9-1), sovel-aic8800-dkms (>= 1.0.0+git2e75f888-1), labwc, cage, greetd, gtklock, foot, resources, packagekit, network-manager, network-manager-applet, bluez, blueman, lxqt-policykit, xwayland, python3, flatpak, python3-gi, gir1.2-flatpak-1.0, ca-certificates, qml6-module-qtquick-dialogs, qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-window, qml6-module-qtqml-workerscript, qml6-module-qtquick-effects, qt6-wayland, qt6-svg-plugins, qt6-image-formats-plugins, coreutils, libglib2.0-bin, xdg-utils, xdg-user-dirs, grim, slurp, wl-clipboard, libnotify-bin, mako-notifier, pipewire, pipewire-pulse, pulseaudio-utils, wireplumber, xdg-desktop-portal, xdg-desktop-portal-wlr, xdg-desktop-portal-gtk, fonts-noto-core, fonts-noto-extra, fonts-noto-cjk, fonts-noto-color-emoji, fcitx5, fcitx5-frontend-qt6, fcitx5-frontend-gtk3, fcitx5-frontend-gtk4, fcitx5-mozc, fcitx5-chinese-addons, fcitx5-hangul, fcitx5-m17n, fcitx5-config-qt, llama.cpp-tools (>= 8681), espeak-ng
+Description: Sovel desktop, Settings and system integration
+ The public Sovel desktop with signed system updates in Settings.
+Filename: pool/main/s/sovel-desktop/sovel-desktop_0.1.0-8_amd64.deb
+Size: 4870916
+MD5sum: aa392f9ff540f73df267945513c03812
+SHA1: aa26b3cccdfd237a80994c2efa8b5573484a7c9d
+SHA256: 327d5d3926ea2357f1e897e6595b3a668de7753b32913b41c0f134199effed9f
+SHA512: a65a94e846f1492d995376be05c7ce433eda8487f935693a6ec14bf4c9895ddfd106bea4a3672690cc764238d22da0a818c3d012fcc324061c515c2d4a7d9c92
+
 Package: sovel-wallpaper-tools
 Version: 2.9+mpv1.9-1
 Architecture: amd64

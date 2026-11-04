@@ -1,5 +1,10 @@
 # Sovel public updates
 
+Desktop update `0.1.0-8` **Horizon** adds 29 Settings pages, Wi-Fi discovery and saved profiles,
+configurable menu-bar controls, signed release history, 14 additional Store apps
+and 24 configurable widgets. All previous Store listings and the greeter are preserved.
+See [Horizon release notes](releases/0.1.0-8.md) for features, validation and limits.
+
 Desktop update `0.1.0-7` adds the Sound revamp, local Mini JARED,
 reliable bar/dock activation controls, Bluetooth friendly names and a monthly
 calendar. All 23 Store listings and the greeter are preserved. See
