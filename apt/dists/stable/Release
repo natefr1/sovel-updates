@@ -1,25 +1,16 @@
-Acquire-By-Hash: yes
-Architectures: amd64
-Codename: stable
-Components: main
-Date: Tue, 03 Nov 2026 22:53:33 +0000
-Description: Signed Sovel public system updates
-Label: Sovel Public Updates
 Origin: Sovel
+Label: Sovel Public Updates
 Suite: stable
-MD5Sum:
- 7fc7e7dc67b25c229d56156b2f1889fa              849 Release
- a40ec15f50243619838668f21254e167             5620 main/binary-amd64/Packages
- a77213513ac12d065dc542b5122d814b             1416 main/binary-amd64/Packages.gz
-SHA1:
- c556e76f8face71e28e48a69d6b9bf995188be76              849 Release
- 622582dc03183250d6c57ea34db6072876e65a04             5620 main/binary-amd64/Packages
- 0004a8b5162cdc08ee054652fdfcea464009cf3e             1416 main/binary-amd64/Packages.gz
+Codename: stable
+Date: Wed, 04 Nov 2026 00:35:29 GMT
+Valid-Until: Fri, 04 Dec 2026 00:35:29 GMT
+Architectures: amd64
+Components: main
+Description: Signed Sovel public system updates
+Acquire-By-Hash: yes
 SHA256:
- d90d829471c9dd77d78dd29f4af83ec161353f3cdeec500b6c88c316b33dd74e              849 Release
- 7c912cc9de818dd9a5bc39bd3637a3183f821c7e10fcb8ac3beac34611ea43e7             5620 main/binary-amd64/Packages
- f50d53e3defd4f20b579559393bbdee750c01ae165dc1e5e58fdd37c6613fcc5             1416 main/binary-amd64/Packages.gz
+ 050e514cbbbe4b0e7b3d8101f16369ee1226c4fbf1d06dde04954a3faeedfa9d             8744 main/binary-amd64/Packages
+ bc8ec4bed9746ca78058164881faf699f48779db641ded9a4d68811c8ef18ff9             2456 main/binary-amd64/Packages.gz
 SHA512:
- b5d8fd0ed5f1932c533f884049270c7c5b01090760f9f3b1c3ef9f0e6e4d566dd034df47f0da96eed0e6e6b83310f40d45fec5c9ec3a42eda1251e27d66bb726              849 Release
- 07f2827cefe4793cffb655d2b561d94257a069942e86dc946d298b4c8a53fd21e72a0d4c315b38d3a7e2e56bc8f35c5682d410e3218cc72d02615da526dd7807             5620 main/binary-amd64/Packages
- c20b09cc465b28db362fd10e959da8f2654534c16cb409006ad08e9d1aab012414cebb36513e143fa1a8f5bab909add0cef17384b7672290c3c6223dd5b01879             1416 main/binary-amd64/Packages.gz
+ bda3747454ee430b0448c085e96abf0f4199ad3d88d093aa90241fb5063230b293855727a1f847cf64ba191e8113a3313b69df2e144455ffd6cfbb5004e9ebbc             8744 main/binary-amd64/Packages
+ 6612e0f6fbaf85b2e7db411b6737be355a35f1057525a32ea94686d9da30a795ff116a8600cb74e18f861c218143e4ac9b30040b7f2b817e4bf55f3d57637b17             2456 main/binary-amd64/Packages.gz

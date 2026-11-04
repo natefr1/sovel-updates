@@ -1,9 +1,13 @@
 # Sovel public updates
 
-Desktop update `0.1.0-4` adds the redesigned Store with browsable collections,
-publisher screenshots, app detail pages and Install/Open actions. It also adds
-Motion Wallpapers for aurora animations and looping local video backgrounds,
-coalesces Wi-Fi scan notifications and handles desktop output reconnection.
+Desktop update `0.1.0-5` adds the redesigned Files app, persistent dock pinning
+and drag reordering, same-window minimize/restore, and a reviewed installer for
+downloaded `.deb` packages. External Waypaper and mpvpaper replace the built-in
+Motion app. See [release notes](releases/0.1.0-5.md) for usage and validation.
+
+Desktop update `0.1.0-4` added the redesigned Store with browsable collections,
+publisher screenshots, app detail pages and Install/Open actions. It also
+coalesced Wi-Fi scan notifications and handled desktop output reconnection.
 The reported GTX 1070 hard lockup and physical USB Wi-Fi operation still need
 hardware verification; this release does not claim those are resolved.
 
