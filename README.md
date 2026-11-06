@@ -1,5 +1,7 @@
 # Sovel public updates
 
+Desktop update `0.1.0-10` **Dual Environment** separates the everyday city desktop from an encrypted Private Workspace with JARED and Vault. See the [Dual Environment release notes](releases/0.1.0-10.md).
+
 Desktop update `0.1.0-9` **Workspace** adds multi-display controls, Sovel Files improvements and
 JARED Notes, Projects, Research and local voice. See the [Workspace release notes](releases/0.1.0-9.md).
 
