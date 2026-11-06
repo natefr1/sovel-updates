@@ -1,0 +1,33 @@
+#!/usr/bin/python3
+"""Permit only the local root installer on this live user's Xwayland display."""
+import ctypes as C
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+if not Path('/etc/sovel/live-image').is_file() or not os.environ.get('DISPLAY'):
+    raise SystemExit(1)
+class ServerAddress(C.Structure):
+    _fields_=[('typelength',C.c_int),('valuelength',C.c_int),('type',C.c_char_p),('value',C.c_char_p)]
+class HostAddress(C.Structure):
+    _fields_=[('family',C.c_int),('length',C.c_int),('address',C.c_void_p)]
+x=C.CDLL('libX11.so.6')
+x.XOpenDisplay.argtypes=[C.c_char_p];x.XOpenDisplay.restype=C.c_void_p
+x.XAddHost.argtypes=[C.c_void_p,C.POINTER(HostAddress)]
+x.XRemoveHost.argtypes=[C.c_void_p,C.POINTER(HostAddress)]
+x.XSync.argtypes=[C.c_void_p,C.c_int];x.XCloseDisplay.argtypes=[C.c_void_p]
+display=x.XOpenDisplay(None)
+if not display: raise SystemExit('Setup could not connect to the display.')
+server=ServerAddress(9,4,b'localuser',b'root')
+address=HostAddress(5,C.sizeof(server),C.cast(C.pointer(server),C.c_void_p))
+x.XAddHost(display,C.byref(address));x.XSync(display,0)
+# Keep the display connection alive: Xwayland otherwise resets its temporary
+# access list when its final client exits. Remove the grant when setup ends.
+environment=os.environ.copy();environment['QT_QPA_PLATFORM']='xcb'
+preserve='DISPLAY,XAUTHORITY,WAYLAND_DISPLAY,XDG_RUNTIME_DIR,QT_QPA_PLATFORM,QT_QUICK_CONTROLS_STYLE,QML_IMPORT_PATH,QT_QUICK_BACKEND,QSG_RHI_BACKEND,LIBGL_ALWAYS_SOFTWARE'
+try:
+    result=subprocess.run(['sudo','-n','--preserve-env='+preserve,'/usr/bin/calamares',*sys.argv[1:]],env=environment)
+finally:
+    x.XRemoveHost(display,C.byref(address));x.XSync(display,0);x.XCloseDisplay(display)
+raise SystemExit(result.returncode)

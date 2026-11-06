@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Settings
+Exec=/usr/bin/sovel --app settings
+Icon=sovel-settings
+Terminal=false
+Categories=Utility;
+StartupNotify=true

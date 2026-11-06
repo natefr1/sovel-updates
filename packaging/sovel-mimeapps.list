@@ -1,0 +1,4 @@
+[Default Applications]
+application/vnd.debian.binary-package=sovel-package-installer.desktop;
+application/x-deb=sovel-package-installer.desktop;
+inode/directory=sovel-files.desktop;

@@ -1,0 +1,13 @@
+#!/usr/bin/python3
+"""Record completed package configuration; called by root package postinst."""
+import datetime,json,os,sys
+from pathlib import Path
+if os.geteuid()!=0 or len(sys.argv)!=2:raise SystemExit(2)
+source=Path('/usr/share/sovel/release.json');record=json.loads(source.read_text(encoding='utf-8'))
+if record.get('version')!=sys.argv[1]:raise SystemExit('Release version does not match the installed package.')
+path=Path('/var/lib/sovel/release-history.json');path.parent.mkdir(parents=True,exist_ok=True)
+try:history=json.loads(path.read_text(encoding='utf-8'))
+except (OSError,ValueError):history=[]
+record['installedAt']=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
+history.append(record);temporary=path.with_suffix('.tmp')
+temporary.write_text(json.dumps(history[-100:],ensure_ascii=False,indent=2)+'\n',encoding='utf-8');os.chmod(temporary,0o644);os.replace(temporary,path)

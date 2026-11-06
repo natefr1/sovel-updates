@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Downloads
+Comment=Open downloaded files in Sovel Files
+Exec=sovel --downloads
+Icon=folder-download
+Categories=Utility;FileManager;
+StartupNotify=true

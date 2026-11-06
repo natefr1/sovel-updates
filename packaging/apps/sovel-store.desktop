@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Store
+Exec=/usr/bin/sovel --app store
+Icon=sovel-store
+Terminal=false
+Categories=Utility;
+StartupNotify=true

@@ -1,0 +1,339 @@
+#!/usr/bin/python3
+"""Persistent per-user transfer jobs, independent of Files windows."""
+
+import html
+import json
+import os
+from pathlib import Path
+import re
+import runpy
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.request
+from urllib.parse import urlsplit
+
+
+ROOT = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "Sovel" / "transfers"
+move_new = runpy.run_path(str(Path(__file__).with_name("sovel-archive")))["move_new"]
+
+
+class Cancelled(Exception):
+    pass
+
+
+def read(path):
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def save(path, value):
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, delete=False) as stream:
+        json.dump(value, stream, ensure_ascii=True)
+        temporary = Path(stream.name)
+    temporary.replace(path)
+
+
+def fingerprint(info):
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_size, info.st_mtime_ns)
+
+
+def inventory(source):
+    items = {}
+    pending = [Path(".")]
+    while pending:
+        relative = pending.pop()
+        file = source / relative if relative.parts else source
+        info = file.lstat()
+        items[relative] = fingerprint(info)
+        if len(items) > 100_000:
+            raise ValueError("This transfer exceeds 100,000 items. Split it into smaller jobs.")
+        if stat.S_ISDIR(info.st_mode):
+            pending.extend(relative / item.name for item in file.iterdir())
+        elif not (stat.S_ISLNK(info.st_mode) or stat.S_ISREG(info.st_mode)):
+            raise ValueError(f"Cannot copy the special file {file.name!r}.")
+    return items
+
+
+def progress(job_path, job):
+    control = job_path.with_suffix(".control")
+    last_update = 0.0
+    started = time.monotonic()
+
+    def checkpoint(force=False):
+        nonlocal last_update
+        try:
+            state = control.read_text(encoding="ascii").strip()
+        except OSError:
+            state = ""
+        if state == "cancel":
+            raise Cancelled
+        if state == "pause":
+            job.update(state="paused", speed=0, eta=None)
+            save(job_path, job)
+            while state == "pause":
+                time.sleep(.2)
+                try:
+                    state = control.read_text(encoding="ascii").strip()
+                except OSError:
+                    state = ""
+            if state == "cancel":
+                raise Cancelled
+            job["state"] = "running"
+            force = True
+        tick = time.monotonic()
+        if force or tick - last_update >= .25:
+            speed = int(job["bytes"] / max(.1, tick - started))
+            eta = max(0, (job["total"] - job["bytes"]) // speed) if speed and job["total"] else None
+            job.update(speed=speed, eta=eta)
+            save(job_path, job)
+            last_update = tick
+    return checkpoint
+
+
+def transfer(job_path, job):
+    destination = Path(job["destination"]).resolve(strict=True)
+    sources = [Path(item) for item in job["sources"]]
+    if not destination.is_dir() or not sources or len(sources) > 1000:
+        raise ValueError("Choose existing files and a destination folder.")
+    for path in sources:
+        if not path.is_absolute() or path.name in ("", ".", ".."):
+            raise ValueError("Choose files with a valid location.")
+        if not path.is_symlink() and path.is_dir() and destination.is_relative_to(path.resolve()):
+            raise ValueError("A folder cannot be copied inside itself.")
+    names = [path.name for path in sources]
+    if len(set(names)) != len(names):
+        raise ValueError("Several source items have the same name.")
+    for name in names:
+        path = destination / name
+        if path.exists() or path.is_symlink():
+            raise FileExistsError(f"An item named {name!r} already exists. No files were overwritten.")
+    plans = [(source, inventory(source)) for source in sources]
+    job.update(state="running", total=sum(i[3] for _, plan in plans for i in plan.values() if stat.S_ISREG(i[2])),
+               bytes=0, items=0, count=sum(len(plan) for _, plan in plans), pid=os.getpid())
+    save(job_path, job)
+    checkpoint = progress(job_path, job)
+
+    with tempfile.TemporaryDirectory(prefix=".sovel-transfer-", dir=destination) as temporary:
+        stage = Path(temporary)
+        for source, plan in plans:
+            directories = []
+            for relative, before in plan.items():
+                checkpoint()
+                source_file = source / relative if relative.parts else source
+                target = stage / source.name / relative if relative.parts else stage / source.name
+                if fingerprint(source_file.lstat()) != before:
+                    raise OSError(f"{source_file.name!r} changed during the transfer.")
+                if stat.S_ISDIR(before[2]):
+                    target.mkdir()
+                    directories.append((source_file, target))
+                elif stat.S_ISLNK(before[2]):
+                    target.symlink_to(os.readlink(source_file))
+                else:
+                    fd = os.open(source_file, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+                    with os.fdopen(fd, "rb") as incoming, target.open("xb") as outgoing:
+                        if fingerprint(os.fstat(incoming.fileno())) != before:
+                            raise OSError(f"{source_file.name!r} changed during the transfer.")
+                        while block := incoming.read(1024 * 1024):
+                            outgoing.write(block)
+                            job["bytes"] += len(block)
+                            checkpoint()
+                        if fingerprint(os.fstat(incoming.fileno())) != before:
+                            raise OSError(f"{source_file.name!r} changed during the transfer.")
+                        outgoing.flush()
+                        os.fsync(outgoing.fileno())
+                    shutil.copystat(source_file, target, follow_symlinks=False)
+                job["items"] += 1
+            for source_dir, target_dir in reversed(directories):
+                shutil.copystat(source_dir, target_dir, follow_symlinks=False)
+        checkpoint(True)
+        # Check the original tree again before committing. Keep originals if
+        # they change during the copy, including files created while it ran.
+        for source, plan in plans:
+            if inventory(source) != plan:
+                raise OSError(f"{source.name!r} changed during the transfer.")
+        job.update(state="finishing", speed=0, eta=None)
+        save(job_path, job)
+        published = []
+        try:
+            for source in sources:
+                move_new(stage / source.name, destination / source.name)
+                published.append(source.name)
+        except OSError:
+            for name in reversed(published):
+                move_new(destination / name, stage / name)
+            raise
+        if job["move"]:
+            for source, plan in plans:
+                quarantine = Path(tempfile.mkdtemp(prefix=".sovel-move-", dir=source.parent))
+                held = quarantine / source.name
+                try:
+                    move_new(source, held)
+                    if inventory(held) != plan:
+                        move_new(held, source)
+                        raise OSError(f"{source.name!r} changed. Both copies were kept.")
+                    if held.is_dir() and not held.is_symlink():
+                        shutil.rmtree(held)
+                    else:
+                        held.unlink()
+                except OSError as error:
+                    if held.exists() or held.is_symlink():
+                        raise OSError(f"Destination copy is complete. Original recovery location: {held}") from error
+                    raise
+                finally:
+                    try:
+                        quarantine.rmdir()
+                    except OSError:
+                        pass
+
+
+class HttpsRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if urlsplit(newurl).scheme != "https":
+            raise ValueError("The download redirected to an insecure address.")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def download(job_path, job):
+    url = job["url"]
+    name = job["filename"]
+    parsed = urlsplit(url)
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        raise ValueError("Enter a valid HTTPS download address.")
+    if not name or Path(name).name != name or name in (".", ".."):
+        raise ValueError("Choose a filename without slashes.")
+    destination = Path(job["destination"]).resolve(strict=True)
+    target = destination / name
+    if target.exists() or target.is_symlink():
+        raise FileExistsError(f"A file named {name!r} already exists.")
+    available = max(0, shutil.disk_usage(destination).free - 16 * 1024 * 1024)
+    job.update(state="running", total=0, bytes=0, pid=os.getpid())
+    checkpoint = progress(job_path, job)
+    checkpoint(True)
+    opener = urllib.request.build_opener(HttpsRedirect)
+    request = urllib.request.Request(url, headers={"User-Agent": "Sovel Files"})
+    with opener.open(request, timeout=20) as incoming, tempfile.TemporaryDirectory(
+            prefix=".sovel-download-", dir=destination) as temporary:
+        job["mime"] = incoming.headers.get_content_type()
+        job["total"] = int(incoming.headers.get("Content-Length") or 0)
+        if job["total"] > available:
+            raise OSError("There is not enough free space to download this file.")
+        staged = Path(temporary) / "download"
+        with staged.open("xb") as outgoing:
+            while block := incoming.read(256 * 1024):
+                job["bytes"] += len(block)
+                if job["bytes"] > available:
+                    raise OSError("There is not enough free space to finish this download.")
+                outgoing.write(block)
+                checkpoint()
+            if job["total"] and job["bytes"] != job["total"]:
+                raise OSError("The server returned an incomplete download.")
+            outgoing.flush()
+            os.fsync(outgoing.fileno())
+        checkpoint(True)
+        job.update(state="finishing", speed=0, eta=None)
+        save(job_path, job)
+        move_new(staged, target)
+    job["file"] = str(target)
+
+
+def notify_result(job):
+    if not job.get("notify", True) or not os.environ.get("DBUS_SESSION_BUS_ADDRESS") or not shutil.which("notify-send"):
+        return
+    downloaded = job.get("kind") == "download"
+    heading = ("Download " if downloaded else "File transfer ") + job["state"]
+    body = html.escape(str(job.get("error") or job.get("filename") or job["destination"]))
+    arguments = ["notify-send", "--app-name=Sovel Files"]
+    if not downloaded or job["state"] != "complete":
+        os.spawnlp(os.P_NOWAIT, "notify-send", *arguments, "--", heading, body)
+        return
+    try:
+        choice = download_notification_action(heading, body)
+        if choice == "open" and Path(job["file"]).is_file():
+            subprocess.Popen(["xdg-open", job["file"]], stdin=subprocess.DEVNULL,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif choice == "default" and Path(job["destination"]).is_dir():
+            sovel = shutil.which("sovel")
+            command = [sovel, "--open-folder"] if sovel else ["xdg-open"]
+            subprocess.Popen([*command, job["destination"]], stdin=subprocess.DEVNULL,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError:
+        pass
+
+
+def download_notification_action(heading, body):
+    from gi.repository import Gio, GLib
+
+    interface = "org.freedesktop.Notifications"
+    path = "/org/freedesktop/Notifications"
+    loop = GLib.MainLoop()
+    selected = []
+    identifier = 0
+
+    def receive(_bus, _sender, _path, _interface, signal, parameters, _data):
+        if signal not in ("ActionInvoked", "NotificationClosed"):
+            return
+        values = parameters.unpack()
+        if values[0] != identifier:
+            return
+        if signal == "ActionInvoked":
+            selected.append(values[1])
+        loop.quit()
+
+    def expire():
+        loop.quit()
+        return GLib.SOURCE_CONTINUE
+
+    try:
+        bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    except GLib.Error:
+        return ""
+    subscription = bus.signal_subscribe(interface, interface, None, path, None,
+                                        Gio.DBusSignalFlags.NONE, receive, None)
+    timeout = GLib.timeout_add_seconds(15, expire)
+    try:
+        actions = ["default", "Show in Folder", "open", "Open File"]
+        notice = GLib.Variant("(susssasa{sv}i)", ("Sovel Files", 0, "sovel-files",
+                             heading, body, actions, {}, 10000))
+        identifier, = bus.call_sync(interface, path, interface, "Notify", notice,
+                                    GLib.VariantType.new("(u)"), Gio.DBusCallFlags.NONE,
+                                    3500, None).unpack()
+        loop.run()
+    except GLib.Error:
+        return ""
+    finally:
+        bus.signal_unsubscribe(subscription)
+        GLib.source_remove(timeout)
+    return selected[0] if selected else ""
+
+
+def main():
+    identifier, = sys.argv[1:]
+    if not re.fullmatch(r"[a-f0-9]{32}", identifier):
+        raise ValueError("Invalid job identifier.")
+    path = ROOT / (identifier + ".json")
+    job = read(path)
+    if job.get("state") != "queued":
+        raise ValueError("This transfer is not queued.")
+    try:
+        if job.get("kind") == "download":
+            download(path, job)
+        else:
+            transfer(path, job)
+        job.update(state="complete", error="", speed=0, eta=0)
+    except Cancelled:
+        job.update(state="cancelled", error="", speed=0, eta=None)
+    except (ValueError, OSError) as error:
+        job.update(state="failed", error=str(error), speed=0, eta=None)
+    finally:
+        job["finished"] = time.time()
+        save(path, job)
+        path.with_suffix(".control").unlink(missing_ok=True)
+    notify_result(job)
+
+
+if __name__ == "__main__":
+    main()

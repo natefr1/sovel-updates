@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Files
+Exec=/usr/bin/sovel --open-folder %f
+MimeType=inode/directory;
+Icon=sovel-files
+Terminal=false
+Categories=Utility;
+StartupNotify=true

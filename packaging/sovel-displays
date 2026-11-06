@@ -1,0 +1,242 @@
+#!/usr/bin/python3
+"""Display transactions for Labwc. Unconfirmed hardware changes roll back."""
+
+import fcntl
+import json
+import math
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
+import time
+import uuid
+
+
+TRANSFORMS = {"normal", "90", "180", "270", "flipped", "flipped-90", "flipped-180", "flipped-270"}
+CONFIG = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "Sovel" / "Displays.json"
+RUNTIME = Path(os.environ["XDG_RUNTIME_DIR"]) / "sovel-displays"
+PENDING = RUNTIME / "pending.json"
+ENVIRONMENT = dict(os.environ, LC_ALL="C")
+
+
+def read(path):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def save(path, value):
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, delete=False) as target:
+        json.dump(value, target, ensure_ascii=False)
+        temporary = Path(target.name)
+    try:
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def randr(*args):
+    result = subprocess.run(["wlr-randr", *args], capture_output=True, text=True,
+                            env=ENVIRONMENT, timeout=6)
+    if result.returncode:
+        raise OSError(result.stderr.strip() or "Labwc rejected the display configuration.")
+    return result.stdout
+
+
+def parse_outputs(text):
+    outputs = []
+    for line in text.splitlines():
+        if not line or not line.strip():
+            continue
+        if not line[0].isspace():
+            parts = line.split(maxsplit=1)
+            name = parts[0]
+            output = {"name": name, "description": parts[1].strip('"') if len(parts) == 2 else name,
+                      "connection": name.rsplit("-", 1)[0], "modes": [], "enabled": False,
+                      "x": 0, "y": 0, "scale": 1.0, "transform": "normal", "mode": ""}
+            outputs.append(output)
+            continue
+        if not outputs:
+            continue
+        value = line.strip()
+        if value.startswith("Enabled:"):
+            output["enabled"] = value.endswith("yes")
+        elif value.startswith(("Make:", "Model:", "Serial:")):
+            key, detail = value.split(":", 1)
+            if detail.strip() != "(null)":
+                output[key.lower()] = detail.strip()
+        elif value.startswith("Position:"):
+            output["x"], output["y"] = map(int, value.split(":", 1)[1].split(","))
+        elif value.startswith("Scale:"):
+            output["scale"] = float(value.split(":", 1)[1])
+        elif value.startswith("Transform:"):
+            output["transform"] = value.split(":", 1)[1].strip()
+        elif match := re.match(r"(\d+)x(\d+) px(?:, ([\d.]+) Hz)?(.*)$", value):
+            width, height, rate, flags = match.groups()
+            mode = width + "x" + height
+            if rate:
+                mode += f"@{float(rate):.3f}Hz"
+            output["modes"].append({"id": mode, "width": int(width), "height": int(height),
+                                    "refresh": float(rate or 0), "preferred": "preferred" in flags})
+            if "current" in flags:
+                output["mode"] = mode
+    for output in outputs:
+        if not output["mode"] and output["modes"]:
+            output["mode"] = next((m["id"] for m in output["modes"] if m["preferred"]), output["modes"][0]["id"])
+    return outputs
+
+
+def current():
+    outputs = parse_outputs(randr())
+    if not outputs:
+        raise OSError("Labwc has not reported any display outputs.")
+    return outputs
+
+
+def identity(output):
+    return output["name"] + "\n" + output["description"] + "\n" + output.get("serial", "")
+
+
+def settings(outputs, proposal, require_complete):
+    by_name = {row["name"]: row for row in outputs}
+    if not isinstance(proposal, list) or len(proposal) > 32:
+        raise ValueError("Invalid display arrangement.")
+    result = []
+    used = set()
+    for row in proposal:
+        name = row["name"]
+        if name in used or name not in by_name:
+            raise ValueError("A display changed. Detect displays and try again.")
+        used.add(name)
+        device = by_name[name]
+        active = row["enabled"]
+        if type(active) is not bool:
+            raise ValueError("Invalid display state.")
+        mode, transform = row["mode"], row["transform"]
+        x, y, scale = row["x"], row["y"], row["scale"]
+        if active:
+            if mode and mode not in {entry["id"] for entry in device["modes"]}:
+                raise ValueError(f"{name} does not advertise this resolution and refresh rate.")
+            if transform not in TRANSFORMS or type(x) is not int or type(y) is not int:
+                raise ValueError("Invalid orientation or display position.")
+            if abs(x) > 32768 or abs(y) > 32768 or not math.isfinite(scale) or not 0.5 <= scale <= 4:
+                raise ValueError("Display position or scale is outside the supported range.")
+        result.append(dict(name=name, description=device["description"], enabled=active, mode=mode,
+                           transform=transform, x=x, y=y, scale=scale, identity=identity(device)))
+    if require_complete and set(by_name) != used:
+        raise ValueError("A display changed. Detect displays and try again.")
+    if not any(row["enabled"] for row in result):
+        raise ValueError("At least one display must stay enabled.")
+    return result
+
+
+def apply(rows):
+    arguments = []
+    for row in rows:
+        arguments.extend(("--output", row["name"], "--on" if row["enabled"] else "--off"))
+        if not row["enabled"]:
+            continue
+        if row["mode"]:
+            arguments.extend(("--mode", row["mode"]))
+        arguments.extend(("--pos", f'{row["x"]},{row["y"]}', "--scale", str(row["scale"]),
+                          "--transform", row["transform"]))
+    randr("--dryrun", *arguments)
+    randr(*arguments)
+
+
+def restore(rows):
+    outputs = current()
+    saved = {row["identity"]: row for row in rows}
+    proposal = [saved.get(identity(output), output) for output in outputs]
+    apply(settings(outputs, proposal, True))
+
+
+def run(action, argument=None):
+    pending = read(PENDING)
+    if action == "list":
+        return {"outputs": current(), "config": read(CONFIG), "pending": pending.get("token", "")}
+    if action == "identify":
+        numbers = {row["name"]: index for index, row in enumerate(current(), 1)}
+        save(RUNTIME / "identify.json", {"until": time.time() + 6, "numbers": numbers})
+        return {"message": "Showing display numbers."}
+    if action == "revert":
+        if argument and pending.get("token") == argument:
+            restore(pending["before"])
+            PENDING.unlink(missing_ok=True)
+        return {"message": "Previous display arrangement restored."}
+    if action == "keep":
+        if not argument or pending.get("token") != argument:
+            raise ValueError("This display change has already expired.")
+        save(CONFIG, pending["after"])
+        PENDING.unlink(missing_ok=True)
+        return {"message": "Display arrangement saved."}
+    if pending:
+        raise ValueError("Confirm or revert the current display change first.")
+    if action == "restore":
+        saved = read(CONFIG).get("outputs", [])
+        if saved:
+            restore(saved)
+        return {}
+    if action == "preview":
+        outputs = current()
+        rows = settings(outputs, argument["outputs"], True)
+        primary = argument.get("primary", "")
+        if primary not in {row["name"] for row in rows if row["enabled"]}:
+            raise ValueError("The primary display must be enabled.")
+        old = read(CONFIG)
+        names = {row["name"] for row in rows}
+        disconnected = [row for row in old.get("outputs", []) if row["name"] not in names]
+        preferences = dict(outputs=rows+disconnected[:32], primary=primary)
+        for key in ("bar", "dock"):
+            value = argument.get(key, "all")
+            if value not in ("all", "primary"):
+                raise ValueError("Unknown bar or dock placement.")
+            preferences[key] = value
+        wallpaper = {name: path for name, path in old.get("wallpaper", {}).items() if name not in names}
+        for name, value in argument.get("wallpaper", {}).items():
+            if name in {row["name"] for row in rows} and isinstance(value, str) and len(value) <= 4096:
+                if value and not Path(value).is_file():
+                    raise ValueError("A selected wallpaper file is unavailable.")
+                wallpaper[name] = value
+        preferences["wallpaper"] = wallpaper
+        token = uuid.uuid4().hex
+        save(PENDING, {"token": token, "before": settings(outputs, outputs, True), "after": preferences})
+        try:
+            subprocess.Popen([sys.executable, __file__, "deadline", token], start_new_session=True,
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            apply(rows)
+        except (OSError, subprocess.TimeoutExpired):
+            try:
+                restore(pending.get("before", settings(outputs, outputs, True)))
+            finally:
+                PENDING.unlink(missing_ok=True)
+            raise
+        return {"pending": token, "message": "Keep these display changes? They revert in 20 seconds."}
+    raise ValueError("Unsupported display action.")
+
+
+def main():
+    action = sys.argv[1]
+    argument = sys.argv[2] if len(sys.argv) > 2 else None
+    if action == "preview":
+        argument = json.loads(sys.stdin.buffer.read(128 * 1024))
+    if action == "deadline":
+        time.sleep(20)
+        action = "revert"
+    RUNTIME.mkdir(mode=0o700, exist_ok=True)
+    with (RUNTIME / "lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        result = run(action, argument)
+    print(json.dumps(result, ensure_ascii=True))
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired) as error:
+        print(str(error), file=sys.stderr)
+        sys.exit(1)

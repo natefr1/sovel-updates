@@ -1,0 +1,148 @@
+#!/usr/bin/python3
+"""User-session UDisks2 operations, using the system's authorization policy."""
+
+import json
+import os
+import shutil
+import sys
+
+from gi.repository import Gio, GLib
+
+
+SERVICE = "org.freedesktop.UDisks2"
+ROOT = "/org/freedesktop/UDisks2"
+BLOCK = SERVICE + ".Block"
+DRIVE = SERVICE + ".Drive"
+FS = SERVICE + ".Filesystem"
+TABLE = SERVICE + ".PartitionTable"
+
+
+def call(bus, path, interface, method, arguments=None, timeout=7000):
+    result = bus.call_sync(SERVICE, path, interface, method, arguments, None,
+                           Gio.DBusCallFlags.NONE, timeout, None)
+    return result.unpack()
+
+
+def decode(value):
+    return os.fsdecode(bytes(value).rstrip(b"\0"))
+
+
+def volumes(bus):
+    objects, = call(bus, ROOT, "org.freedesktop.DBus.ObjectManager", "GetManagedObjects")
+    result = []
+    for path, interfaces in objects.items():
+        if BLOCK not in interfaces or TABLE in interfaces:
+            continue
+        block = interfaces[BLOCK]
+        drive_path = block.get("Drive", "/")
+        drive = objects.get(drive_path, {}).get(DRIVE)
+        if drive is None or block.get("HintIgnore"):
+            continue
+        mount_points = [decode(value) for value in interfaces.get(FS, {}).get("MountPoints", [])]
+        connection = drive.get("ConnectionBus", "")
+        removable = bool(drive.get("Removable") or drive.get("MediaRemovable") or connection == "usb")
+        if FS not in interfaces and (not removable or block.get("IdUsage")):
+            continue
+        protected = (bool(block.get("HintSystem")) or not removable
+                     or any(p == "/" or p.startswith(("/boot", "/usr", "/var")) for p in mount_points))
+        location = mount_points[0] if mount_points else ""
+        try:
+            available = shutil.disk_usage(location).free if location else None
+        except OSError:
+            available = None
+        label = block.get("IdLabel", "")
+        device = decode(block.get("PreferredDevice", []))
+        result.append({
+            "id": path,
+            "drive": drive_path,
+            "device": device,
+            "name": label or drive.get("Model") or device or "Storage device",
+            "connection": connection or ("removable" if removable else "internal"),
+            "capacity": block.get("Size", 0),
+            "available": available,
+            "filesystem": block.get("IdType", ""),
+            "mountable": FS in interfaces,
+            "mount": location,
+            "mounts": mount_points,
+            "readonly": bool(block.get("ReadOnly")),
+            "removable": removable,
+            "protected": protected,
+            "powerOff": bool(drive.get("CanPowerOff")),
+            "ejectable": bool(drive.get("Ejectable")),
+            "identity": "|".join(str(value) for value in
+                                  (drive.get("Serial"), block.get("Id"), block.get("IdUUID"), block.get("Size")))
+                        if (drive.get("Serial") or block.get("Id") or block.get("IdUUID")) else "",
+        })
+    return sorted(result, key=lambda item: (not item["removable"], item["name"].casefold(), item["id"]))
+
+
+def operate(bus, action, identifier, arguments):
+    all_volumes = volumes(bus)
+    volume = next((item for item in all_volumes if item["id"] == identifier), None)
+    if volume is None:
+        raise ValueError("This drive is no longer connected.")
+    if volume["protected"]:
+        raise ValueError("Files protects this system or internal volume from drive changes.")
+    options = GLib.Variant("(a{sv})", ({},))
+    if action in ("mount", "auto-mount"):
+        if action == "auto-mount" and (volume["connection"] != "usb" or not volume["identity"]
+                                       or arguments != [volume["identity"]]):
+            raise ValueError("The USB volume changed before automatic mounting.")
+        if not volume["mountable"]:
+            raise ValueError("This volume has no filesystem that Sovel can mount.")
+        mount = volume["mount"]
+        if not mount:
+            mount, = call(bus, identifier, FS, "Mount", options, 120000)
+        return {"mount": mount, "message": "Drive mounted."}
+    if action == "unmount":
+        if volume["mount"]:
+            call(bus, identifier, FS, "Unmount", options, 120000)
+        return {"message": "Volume unmounted."}
+    if action == "eject":
+        siblings = [item for item in all_volumes if item["drive"] == volume["drive"]]
+        if any(item["protected"] for item in siblings):
+            raise ValueError("The drive contains a protected system volume.")
+        for item in siblings:
+            if item["mount"]:
+                call(bus, item["id"], FS, "Unmount", options, 120000)
+        method = "PowerOff" if volume["powerOff"] else "Eject" if volume["ejectable"] else ""
+        if method:
+            call(bus, volume["drive"], DRIVE, method, options, 120000)
+        return {"message": "The drive can now be removed."}
+    if action == "check":
+        if volume["mount"]:
+            raise ValueError("Unmount this volume before checking its filesystem.")
+        clean, = call(bus, identifier, FS, "Check", options, 120000)
+        return {"message": "No filesystem errors reported." if clean else "The filesystem check reported errors."}
+    if action == "label":
+        label, = arguments
+        if not label.strip() or len(label) > 128 or "/" in label or volume["readonly"]:
+            raise ValueError("Choose a valid label for a writable drive.")
+        call(bus, identifier, FS, "SetLabel", GLib.Variant("(sa{sv})", (label, {})), 120000)
+        return {"message": "Drive label updated."}
+    if action == "format":
+        filesystem, confirmation, identity = arguments
+        if confirmation != volume["device"] or not confirmation.startswith("/dev/"):
+            raise ValueError("The device confirmation did not match.")
+        if not identity or identity != volume["identity"]:
+            raise ValueError("The drive changed. Open its details and review it again.")
+        if volume["mounts"] or volume["readonly"] or filesystem not in ("ext4", "exfat", "vfat"):
+            raise ValueError("Choose an unmounted, writable removable volume and a supported filesystem.")
+        call(bus, identifier, BLOCK, "Format", GLib.Variant("(sa{sv})", (filesystem, {})), 120000)
+        return {"message": "The selected removable volume was formatted."}
+    raise ValueError("Unsupported drive operation.")
+
+
+def main():
+    bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+    action, *args = sys.argv[1:]
+    result = {"volumes": volumes(bus)} if action == "list" else operate(bus, action, args[0], args[1:])
+    print(json.dumps(result, ensure_ascii=True))
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (GLib.Error, OSError, ValueError) as error:
+        print(str(error), file=sys.stderr)
+        sys.exit(1)

@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+# The installer is available only in a live image. No stored passwords or
+# blanket privileged launcher are needed in an installed desktop.
+test -f /etc/sovel/live-image || exit 0
+# The mature disk editor and embedded setup pages share one Xwayland window.
+# This avoids the embedded Wayland window losing keyboard focus between pages.
+export QML_IMPORT_PATH=/usr/lib/sovel/qml${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}
+export QT_QUICK_CONTROLS_STYLE=Basic
+exec /usr/libexec/sovel-setup-display "$@"

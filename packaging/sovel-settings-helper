@@ -1,0 +1,281 @@
+#!/usr/bin/python3 -I
+"""Unprivileged Sovel settings queries and explicitly selected user actions."""
+import configparser,datetime,json,os,pwd,re,shutil,subprocess,sys,xml.etree.ElementTree as ET
+from pathlib import Path
+
+PAGES=set('home appearance wallpaper desktop menubar widgets displays sound devices input printers network sharing notifications apps power storage users language datetime accessibility gaming screentime privacy jared backup updates developer about'.split())
+CONFIG=Path(os.environ.get('XDG_CONFIG_HOME',Path.home()/'.config'))/'Sovel'
+TOOLS={
+ 'display-tool':['wdisplays'],'input-methods':['fcitx5-config-qt'],'printers':['system-config-printer'],'scanner':['simple-scan','skanlite'],
+ 'network-tool':['nm-connection-editor'],'ssh':['sshd'],'notifications':['makoctl'],'disks':['gnome-disks'],'disk-usage':['baobab','filelight'],
+ 'account-tool':['gnome-control-center'],'fonts':['gnome-font-viewer'],'screen-reader':['orca'],'on-screen-keyboard':['wvkbd-mobintl','squeekboard'],
+ 'resources':['resources'],'logs':['gnome-logs'],'timedate':['timedatectl'],'hostname':['hostnamectl'],'firewall':['ufw'],'display':['wlr-randr'],
+ 'backup':['deja-dup','pika-backup','timeshift'],'snapshots':['timeshift'],'game-overlay':['mangohud']}
+FLATPAKS={'localsend':'org.localsend.localsend_app','kdeconnect':'org.kde.kdeconnect','flatseal':'com.github.tchx84.Flatseal','steam':'com.valvesoftware.Steam','heroic':'com.heroicgameslauncher.hgl','bottles':'com.usebottles.bottles'}
+ENV={**os.environ,'LC_ALL':'C.UTF-8'}
+def command(args,timeout=5,check=False):
+ try:result=subprocess.run(args,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=ENV,timeout=timeout,text=True)
+ except (OSError,subprocess.TimeoutExpired):
+  if check:raise ValueError('The supporting service did not respond. Retry when available.')
+  return ''
+ if len(result.stdout)>1024*1024:raise ValueError('The service returned too much data.')
+ if check and result.returncode:raise ValueError(result.stderr.strip()[:300] or 'The service did not accept the request.')
+ return result.stdout.strip()
+
+def default_app(mime):
+ try:
+  import gi
+  from gi.repository import Gio
+  app=Gio.AppInfo.get_default_for_type(mime,False)
+  return app.get_id() if app else ''
+ except (ImportError,ValueError):return command(['xdg-mime','query','default',mime],timeout=1)
+def read(path,default=''):
+ try:return Path(path).read_text(encoding='utf-8').strip()
+ except (OSError,UnicodeError):return default
+def prefs():
+ try:
+  file=CONFIG/'Preferences.json'
+  if file.stat().st_size>256*1024:raise ValueError('Preferences exceed the supported size.')
+  result=json.loads(file.read_text(encoding='utf-8'));return result if isinstance(result,dict) else {}
+ except (FileNotFoundError,json.JSONDecodeError):return {}
+def installed_flatpak(app):
+ return any((base/(app+'.desktop')).is_file() for base in [Path.home()/'.local/share/flatpak/exports/share/applications',Path('/var/lib/flatpak/exports/share/applications')])
+def capabilities():
+ result={key:{'available':any(shutil.which(p) for p in programs),'reason':'The supporting application or service is not installed.'} for key,programs in TOOLS.items()}
+ for key,app in FLATPAKS.items():result[key]={'available':installed_flatpak(app),'reason':'Install this application from Store to use its integration.'}
+ if Path('/usr/share/applications/org.kde.kdeconnect.app.desktop').is_file():result['kdeconnect']={'available':True,'reason':'KDE Connect is installed from the signed system repository.'}
+ result['account-tool']={'available':bool(shutil.which('foot') and shutil.which('passwd')),'reason':'Password changes use the system password utility in a private terminal.'}
+ result['touchpad']={'available':any('touchpad' in read(p).lower() for p in Path('/sys/class/input').glob('event*/device/name')),'reason':'No touchpad was detected.'}
+ for key,reason in {'idle-lock':'An idle-lock service is not integrated with this session.','hdr':'The current compositor does not expose an integrated HDR control.','night-light':'No color-temperature service is integrated.','device-tools':'Use the device-specific application when a compatible camera or controller is available.','charge-limit':'Charging threshold controls require supported battery firmware.','hibernate':'Resume and swap readiness have not been verified.','remote-desktop':'No authenticated remote desktop backend is integrated.'}.items():result[key]={'available':False,'reason':reason}
+ return result
+def row(label,value):return {'label':label,'value':str(value) if value not in (None,'') else 'Not available'}
+def flatten_devices(items):
+ output=[]
+ for item in items:output.append(item);output+=flatten_devices(item.get('children',[]))
+ return output
+def storage():
+ data=json.loads(command(['lsblk','--json','--bytes','--output','NAME,TYPE,FSTYPE,SIZE,MOUNTPOINTS,LABEL,MODEL,TRAN,RM']))
+ return flatten_devices(data.get('blockdevices',[]))
+def report(page):
+ if page not in PAGES:raise ValueError('Unknown Settings page.')
+ rows=[];data={};caps=capabilities()
+ if page in ('home','about'):
+  cpu=next((line.split(':',1)[1].strip() for line in read('/proc/cpuinfo').splitlines() if line.startswith('model name')),'Not reported')
+  memory=next((int(line.split()[1])*1024 for line in read('/proc/meminfo').splitlines() if line.startswith('MemTotal:')),0)
+  disk=shutil.disk_usage(Path.home());version=read('/usr/share/doc/sovel-desktop/release.txt').splitlines()
+  rows=[row('Sovel',version[0] if version else 'Sovel Desktop'),row('Computer',os.uname().nodename),row('Processor',cpu),row('Logical processors',os.cpu_count()),row('Memory',f'{memory/1024**3:.1f} GiB'),row('Storage available',f'{disk.free/1024**3:.1f} GiB'),row('Uptime',f'{float(read("/proc/uptime","0").split()[0])/3600:.1f} hours')]
+  if page=='about':rows += [row('Architecture',os.uname().machine),row('Kernel',os.uname().release),row('Desktop','Sovel / Labwc'),row('Device model',read('/sys/class/dmi/id/product_name')),row('Manufacturer',read('/sys/class/dmi/id/sys_vendor'))]
+ elif page=='displays':
+  if shutil.which('wlr-randr'):
+   try:
+    data['displays']=json.loads(command(['wlr-randr','--json']));rows=[row('Connected outputs',len(data['displays']))]
+   except (ValueError,subprocess.TimeoutExpired):rows=[row('Display service','Connect to the graphical Sovel session to inspect outputs.')]
+  cards=[]
+  for path in Path('/sys/class/drm').glob('card[0-9]'):
+   device=path/'device';driver=device/'driver';cards.append({'name':path.name,'vendor':read(device/'vendor'),'device':read(device/'device'),'driver':driver.resolve().name if driver.exists() else 'Not bound'})
+  data['graphics']=cards;rows += [row('Compositor','Labwc'),row('Backdrop capability','Translucency; live backdrop blur is unavailable')]
+ elif page=='devices':
+  data['usb']=[{'vendor':read(p/'manufacturer'),'model':read(p/'product'),'id':read(p/'idVendor')+':'+read(p/'idProduct'),'speed':read(p/'speed')} for p in Path('/sys/bus/usb/devices').glob('*') if (p/'idVendor').exists()]
+  rows=[row('USB devices',len(data['usb']))]
+ elif page=='input':
+  data['devices']=sorted(set(filter(None,(read(p) for p in Path('/sys/class/input').glob('event*/device/name')))))
+  rows=[row('Input devices',len(data['devices'])),row('Session configuration','Per-user Labwc preferences; layout changes may require sign-out.')]
+ elif page=='printers':
+  if shutil.which('lpstat'):rows=[row('Default printer',command(['lpstat','-d'])),row('Queues',command(['lpstat','-p']))]
+  else:rows=[row('Print service','CUPS tools are not installed.')]
+ elif page=='sharing':
+  rows=[row('SSH service',command(['systemctl','is-active','ssh'])),row('Computer name',os.uname().nodename),row('Remote desktop','No integrated remote desktop server is configured.')]
+ elif page=='notifications':
+  rows=[row('Notification service','Mako' if caps['notifications']['available'] else 'Not available')]
+  if caps['notifications']['available']:rows.append(row('Active modes',command(['makoctl','mode'])))
+ elif page=='storage':
+  devices=storage();data['volumes']=devices;rows=[row('Detected block devices',len(devices)),row('Cleanup policy','Review and confirm; no automatic deletion')]
+ elif page=='users':
+  user=pwd.getpwuid(os.getuid());rows=[row('Display name',user.pw_gecos.split(',')[0] or user.pw_name),row('Username',user.pw_name),row('Home folder',user.pw_dir),row('Local account ID',user.pw_uid)]
+  data['users']=[{'username':u.pw_name,'name':u.pw_gecos.split(',')[0],'uid':u.pw_uid} for u in pwd.getpwall() if 1000<=u.pw_uid<65534]
+ elif page=='language':
+  data['locales']=command(['locale','-a']).splitlines();rows=[row('Current language',os.environ.get('LANG','Not set')),row('Installed locales',len(data['locales']))]
+ elif page=='datetime':
+  text=command(['timedatectl','show','--property=Timezone','--property=NTP','--property=NTPSynchronized'])
+  rows=[row(k, v) for k,v in (line.split('=',1) for line in text.splitlines() if '=' in line)];data['timezones']=command(['timedatectl','list-timezones']).splitlines()
+ elif page=='power':
+  batteries=[]
+  for p in Path('/sys/class/power_supply').glob('*'):
+   if read(p/'type') not in ('Battery','UPS'):continue
+   batteries.append({'name':p.name,'type':read(p/'type'),'capacity':read(p/'capacity'),'status':read(p/'status'),'cycles':read(p/'cycle_count'),'full':read(p/'energy_full'),'design':read(p/'energy_full_design')})
+  data['batteries']=batteries;rows=[row('Power source','Battery / UPS' if batteries else 'AC power'),row('Hibernate support','Not verified; no automatic enablement')]
+ elif page=='privacy':
+  secure=next(Path('/sys/firmware/efi/efivars').glob('SecureBoot-*'),None) if Path('/sys/firmware/efi/efivars').exists() else None
+  try:value=('Enabled' if secure.read_bytes()[4] else 'Disabled') if secure else 'Not exposed'
+  except (OSError,AttributeError,IndexError):value='Not readable in this session'
+  rows=[row('Secure Boot',value),row('Permissions','Flatpak / portal controls apply to sandboxed apps; unrestricted native apps have no cosmetic deny switch.')]
+  try:rows.append(row('Encrypted block devices',sum(d.get('type')=='crypt' for d in storage())))
+  except (ValueError,OSError):rows.append(row('Encryption status','Not available'))
+ elif page=='developer':
+  data['tools']={name:bool(shutil.which(name)) for name in ['git','cmake','gcc','python3','podman','docker','virsh','journalctl','flatpak','llama-server','fcitx5','pipewire','wireplumber']}
+  rows=[row('User audio services',command(['systemctl','--user','is-active','pipewire','pipewire-pulse','wireplumber'])),row('Authorization','System changes use the privileged settings helper and polkit.')]
+ elif page=='apps':
+  data['defaults']={kind:default_app(mime) for kind,mime in {'Browser':'x-scheme-handler/https','PDF':'application/pdf','Images':'image/png','Video':'video/mp4','Music':'audio/mpeg','Files':'inode/directory'}.items()}
+  rows=[row(k,v) for k,v in data['defaults'].items()]
+ elif page=='jared':rows=[row('Runtime','Installed' if shutil.which('llama-server') else 'Not installed'),row('Conversation processing','Local; a model download is needed for general questions'),row('Voice input','Not integrated; no background listening')]
+ elif page=='backup':rows=[row('Backup tools','Available' if caps['backup']['available'] else 'No supported backup application is installed'),row('Automatic rollback','Not enabled without configured snapshots')]
+ elif page=='updates':rows=[row('Channel','Signed public / stable'),row('Restart required','Yes' if Path('/run/reboot-required').exists() or Path('/run/sovel-desktop-restart-required').exists() else 'No')]
+ elif page=='screentime':rows=[row('Tracking policy','Off until you explicitly enable it'),row('Remote family service','Not configured')]
+ return {'rows':rows,'capabilities':caps,**data}
+def schema():
+ candidates=[Path('/usr/share/sovel/settings-pages.json'),Path(__file__).resolve().parent.parent/'assets/settings-pages.json']
+ for candidate in candidates:
+  if candidate.is_file():return json.loads(candidate.read_text(encoding='utf-8'))
+ raise ValueError('The settings schema is missing.')
+def apply_preferences():
+ values=prefs();definitions=schema()['preferences'];validated={}
+ for key,d in definitions.items():
+  value=values.get(key,d['default']);kind=d['kind']
+  if kind=='switch' and not isinstance(value,bool):raise ValueError('Invalid boolean preference.')
+  if kind=='slider' and (isinstance(value,bool) or not isinstance(value,(float,int)) or int(value)!=value or not d['minimum']<=value<=d['maximum']):raise ValueError('Invalid numeric preference.')
+  if kind=='choice' and value not in d['choices']:raise ValueError('Invalid selection.')
+  if kind=='color' and not re.fullmatch(r'#[0-9A-Fa-f]{6}',str(value)):raise ValueError('Invalid color.')
+  if kind=='text' and (not isinstance(value,str) or not value.strip() or len(value)>d.get('maxLength',120) or re.search(r'[\x00-\x1f\x7f]',value)):raise ValueError('Invalid text preference.')
+  validated[key]=value
+ base=Path('/usr/share/sovel/labwc/rc.xml')
+ if not base.is_file():base=Path(__file__).resolve().parent/'labwc/rc.xml'
+ tree=ET.parse(base);root=tree.getroot()
+ def setvalue(parent,tag,value):
+  child=parent.find(tag)
+  if child is None:child=ET.SubElement(parent,tag)
+  child.text=str(value)
+ keyboard=root.find('keyboard')
+ if keyboard is None:keyboard=ET.SubElement(root,'keyboard')
+ setvalue(keyboard,'repeatRate',validated['input.repeatRate']);setvalue(keyboard,'repeatDelay',validated['input.repeatDelay'])
+ libinput=root.find('libinput')
+ if libinput is None:libinput=ET.SubElement(root,'libinput')
+ for old in list(libinput):
+  if old.tag=='device' and old.attrib.get('category') in ('default','touchpad'):libinput.remove(old)
+ default=ET.SubElement(libinput,'device',{'category':'default'})
+ for key,value in {'pointerSpeed':validated['input.pointerSpeed']/100,'naturalScroll':'yes' if validated['input.naturalScroll'] else 'no','leftHanded':'yes' if validated['input.leftHanded'] else 'no','accelProfile':validated['input.acceleration']}.items():setvalue(default,key,value)
+ touch=ET.SubElement(libinput,'device',{'category':'touchpad'});setvalue(touch,'tap','yes' if validated['input.tapToClick'] else 'no');setvalue(touch,'disableWhileTyping','yes' if validated['input.disableWhileTyping'] else 'no')
+ desktops=root.find('desktops')
+ if desktops is None:desktops=ET.SubElement(root,'desktops')
+ desktops.set('number',str(validated['desktop.workspaces']));old=desktops.find('number')
+ if old is not None:desktops.remove(old)
+ snapping=root.find('snapping')
+ if snapping is None:snapping=ET.SubElement(root,'snapping')
+ snap_range=snapping.find('range')
+ if snap_range is None:snap_range=ET.SubElement(snapping,'range')
+ snap_range.text=None
+ for edge in ('inner','outer'):setvalue(snap_range,edge,10 if validated['desktop.snap'] else 0)
+ destination=CONFIG/'labwc';destination.mkdir(parents=True,exist_ok=True);temporary=destination/'rc.xml.new';tree.write(temporary,encoding='utf-8',xml_declaration=True);temporary.replace(destination/'rc.xml')
+ autostart=destination/'autostart'
+ if not autostart.exists():autostart.symlink_to('/usr/share/sovel/labwc/autostart')
+ mako=CONFIG/'mako';mako.mkdir(parents=True,exist_ok=True)
+ notification_config='\n'.join(['# Managed by Sovel Settings','background-color=#241830ee','text-color=#f5edff','border-color='+validated['appearance.accent'],'border-radius=14','font='+validated['appearance.font']+' '+str(round(validated['appearance.textSize']*.75)),'default-timeout='+str(validated['notifications.duration']*1000),'max-history='+('100' if validated['notifications.history'] else '0'),'[mode=do-not-disturb]','invisible=1',''])
+ atomic_json(CONFIG/'last-applied.json',{'appliedAt':datetime.datetime.now(datetime.timezone.utc).isoformat()})
+ temporary=mako/'config.new';temporary.write_text(notification_config,encoding='utf-8');temporary.replace(mako/'config')
+ if os.environ.get('WAYLAND_DISPLAY') and shutil.which('labwc'):command(['labwc','--reconfigure'],check=True)
+ if shutil.which('gsettings'):
+  keys=command(['gsettings','list-keys','org.gnome.desktop.interface']).splitlines()
+  mode=validated['appearance.mode'];color='prefer-light' if mode=='light' else 'prefer-dark'
+  if mode=='automatic':color='prefer-light' if 7<=datetime.datetime.now().hour<19 else 'prefer-dark'
+  for key,value in {'color-scheme':color,'font-name':f"{validated['appearance.font']} {round(validated['appearance.textSize']*.75)}"}.items():
+   if key in keys:command(['gsettings','set','org.gnome.desktop.interface',key,value],check=True)
+ if os.environ.get('WAYLAND_DISPLAY') and shutil.which('makoctl'):
+  command(['makoctl','reload'])
+  command(['makoctl','mode','-a' if validated['notifications.focus'] else '-r','do-not-disturb'])
+ return {'message':'Preference saved and supported session settings applied. Some input or startup changes take effect at next sign-in.'}
+def launch(programs,args=()):
+ program=next((shutil.which(name) for name in programs if shutil.which(name)),None)
+ if not program:raise ValueError('The supporting application is not installed.')
+ subprocess.Popen([program,*args],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True,env=ENV)
+ return {'message':'Application opened.'}
+
+MIMES={'Browser':'x-scheme-handler/https','Email':'x-scheme-handler/mailto','PDF':'application/pdf','Images':'image/png','Video':'video/mp4','Music':'audio/mpeg','Files':'inode/directory','Archives':'application/zip'}
+def atomic_json(path,value):
+ path.parent.mkdir(parents=True,exist_ok=True);temporary=path.with_suffix('.new');temporary.write_text(json.dumps(value,ensure_ascii=False,indent=2)+'\n',encoding='utf-8');temporary.chmod(0o600);temporary.replace(path)
+
+def desktop_apps():
+ roots=[Path(os.environ.get('XDG_DATA_HOME',Path.home()/'.local/share'))/'applications',Path.home()/'.local/share/flatpak/exports/share/applications',Path('/var/lib/flatpak/exports/share/applications'),Path('/var/lib/snapd/desktop/applications'),Path('/usr/local/share/applications'),Path('/usr/share/applications')]
+ result={}
+ for base in roots:
+  if not base.is_dir():continue
+  for file in sorted(base.rglob('*.desktop')):
+   identifier=str(file.relative_to(base)).replace('/','-')
+   if identifier in result:continue
+   try:
+    if file.stat().st_size>65536:continue
+    parser=configparser.ConfigParser(interpolation=None,strict=False);parser.read(file,encoding='utf-8');entry=parser['Desktop Entry']
+    if entry.get('Type')!='Application' or entry.get('Hidden','false').lower()=='true' or entry.get('NoDisplay','false').lower()=='true' or not entry.get('Exec'):continue
+    result[identifier]={'id':identifier,'name':entry.get('Name',identifier),'mimeTypes':entry.get('MimeType','').split(';'),'path':str(file),'terminal':entry.get('Terminal','false').lower()=='true'}
+   except (OSError,UnicodeError,configparser.Error,KeyError):continue
+ return result
+
+def startup_items():
+ apps=desktop_apps();file=CONFIG/'Startup.json'
+ try:enabled=json.loads(read(file,'[]'))
+ except ValueError:enabled=[]
+ if not isinstance(enabled,list):enabled=[]
+ return apps,[x for x in enabled if isinstance(x,str) and x in apps]
+
+def run_startup():
+ apps,enabled=startup_items()
+ for identifier in enabled:
+  subprocess.Popen(['gio','launch',apps[identifier]['path']],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True,env=ENV)
+ return {'message':'Enabled login items launched.'}
+
+def user_action(operation,payload):
+ if operation=='apply-preferences':return apply_preferences()
+ if operation=='run-startup':return run_startup()
+ if operation=='default-apps':
+  apps=desktop_apps();return {'message':'Choose a default application.','associations':[{'name':name,'mime':mime,'current':default_app(mime),'apps':[{'id':a['id'],'name':a['name']} for a in apps.values() if mime in a['mimeTypes']]} for name,mime in MIMES.items()]}
+ if operation=='set-default-app':
+  mime=payload.get('mime');identifier=payload.get('app');apps=desktop_apps()
+  if mime not in MIMES.values() or identifier not in apps or mime not in apps[identifier]['mimeTypes']:raise ValueError('Choose an installed application that supports this file type.')
+  from gi.repository import Gio
+  info=Gio.DesktopAppInfo.new_from_filename(apps[identifier]['path'])
+  if info is None or not info.set_as_default_for_type(mime):raise ValueError('The default application could not be changed.')
+  if default_app(mime)!=identifier:raise ValueError('The default application was not confirmed.')
+  return {'message':'Default application updated.'}
+ if operation=='startup-items':
+  apps,enabled=startup_items();return {'message':'These applications open on your next Sovel sign-in.','startup':[{'id':a['id'],'name':a['name'],'enabled':a['id'] in enabled} for a in apps.values() if not a['terminal'] and not a['id'].startswith('sovel-')]}
+ if operation=='set-startup':
+  apps,enabled=startup_items();identifier=payload.get('app');value=payload.get('enabled')
+  if identifier not in apps or not isinstance(value,bool) or identifier.startswith('sovel-') or apps[identifier]['terminal']:raise ValueError('Choose a supported installed login item.')
+  enabled=[x for x in enabled if x!=identifier]
+  if value:enabled.append(identifier)
+  atomic_json(CONFIG/'Startup.json',enabled);return {'message':'Login item preference saved. Takes effect at your next sign-in.'}
+ if operation=='identify-displays':
+  data=json.loads(command(['wlr-randr','--json'],check=True));return {'message':'Connected display names match the display settings utility.','rows':[row(d.get('name','Display'),d.get('description','')) for d in data]}
+ if operation=='ssh-review':return {'message':'SSH status; no remote access policy was changed.','rows':[row('Service',command(['systemctl','is-active','ssh'])),row('Sessions',command(['loginctl','list-sessions','--no-legend']))]}
+
+ mapping={'display-config':'display-tool','input-config':'input-methods','printers':'printers','scanner':'scanner','network-config':'network-tool','disks':'disks','disk-usage':'disk-usage','fonts':'fonts','screen-reader':'screen-reader','on-screen-keyboard':'on-screen-keyboard','resources':'resources','logs':'logs','backup-tool':'backup'}
+ if operation in mapping:return launch(TOOLS[mapping[operation]])
+ if operation in FLATPAKS:
+  if operation=='kdeconnect' and Path('/usr/share/applications/org.kde.kdeconnect.app.desktop').is_file():return launch(['gio'],['launch','/usr/share/applications/org.kde.kdeconnect.app.desktop'])
+  if not installed_flatpak(FLATPAKS[operation]):raise ValueError('Install this application from Store first.')
+  return launch(['flatpak'],['run',FLATPAKS[operation]])
+ if operation=='trash':return launch(['gio'],['open','trash:///'])
+ if operation=='terminal':return launch(['foot'])
+ if operation=='screenshot':return launch(['sovel-screenshot'])
+ if operation=='licenses':return launch(['sovel'],['--app','files','--folder','/usr/share/doc'])
+ if operation=='sessions':return {'message':'Active sessions refreshed.','rows':[row('Sessions',command(['loginctl','list-sessions','--no-legend']))]}
+ if operation=='notification-history':return {'message':'Notification history loaded.','history':json.loads(command(['makoctl','history']))}
+ if operation=='clear-notifications':command(['makoctl','dismiss','--all'],check=True);return {'message':'Visible notifications dismissed.'}
+ if operation=='choose-locale':return {'message':'Installed locales loaded.','locales':command(['locale','-a']).splitlines()}
+ if operation=='set-locale':
+  value=payload.get('locale','')
+  if value not in command(['locale','-a']).splitlines() or not re.fullmatch(r'[A-Za-z0-9_.@-]{1,80}',value):raise ValueError('Choose an installed locale.')
+  folder=CONFIG.parent/'environment.d';folder.mkdir(parents=True,exist_ok=True);(folder/'50-sovel-language.conf').write_text('LANG='+value+'\n',encoding='utf-8');return {'message':'Language preference saved. Sign out and back in to apply it to new applications.'}
+ if operation=='account-security':return launch(['foot'],['--','passwd'])
+ if operation=='sleep-inhibitors':return {'message':'Sleep inhibitors loaded.','rows':[row('Sleep inhibitors',command(['systemd-inhibit','--list','--no-pager']))]}
+ raise ValueError('This settings action is not integrated yet.')
+def main():
+ operation=sys.argv[1] if len(sys.argv)>1 else ''
+ raw=sys.stdin.buffer.read(65537)
+ if len(raw)>65536:raise ValueError('The settings request is too large.')
+ payload=json.loads(raw or b'{}')
+ if not isinstance(payload,dict):raise ValueError('Invalid settings request.')
+ if operation.startswith('report-'):result=report(operation[7:])
+ else:result=user_action(operation,payload)
+ print(json.dumps(result,ensure_ascii=False),flush=True)
+if __name__=='__main__':
+ try:main()
+ except (ValueError,OSError,subprocess.SubprocessError,json.JSONDecodeError) as error:print(json.dumps({'error':str(error)[:400]}),flush=True);sys.exit(1)

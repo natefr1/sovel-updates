@@ -1,0 +1,50 @@
+#!/usr/bin/python3
+"""Read release history and publication fields from APT's verified local cache."""
+import base64,hashlib,json,os,re,subprocess,sys
+from pathlib import Path
+
+def read_json(path,default):
+ try:
+  p=Path(path)
+  if p.stat().st_size>1024*1024:return default
+  return json.loads(p.read_text(encoding='utf-8'))
+ except (OSError,ValueError):return default
+def official_packages():
+ entries=[]
+ base=Path('/var/lib/apt/lists');prefix='raw.githubusercontent.com_natefr1_sovel-updates_main_apt_dists_stable_'
+ signed=base/(prefix+'InRelease');key=Path('/usr/share/keyrings/sovel-updates-archive-keyring.gpg')
+ try:
+  if signed.stat().st_uid!=0 or signed.stat().st_mode&0o022 or key.stat().st_uid!=0 or key.stat().st_mode&0o022:return entries
+  checked=subprocess.run(['gpgv','--output','-','--keyring',str(key),str(signed)],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=10)
+  if checked.returncode:return entries
+  expected=next(line.split()[0] for line in checked.stdout.decode().splitlines() if line.endswith(' main/binary-amd64/Packages') and len(line.split()[0])==64)
+ except (OSError,StopIteration,subprocess.TimeoutExpired):return entries
+ for path in base.glob(prefix+'*Packages*'):
+  stat=path.stat()
+  if stat.st_uid!=0 or stat.st_mode&0o022 or stat.st_size>16*1024*1024:continue
+  process=subprocess.run(['/usr/lib/apt/apt-helper','cat-file',str(path)],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=10)
+  if process.returncode or len(process.stdout)>32*1024*1024:continue
+  if hashlib.sha256(process.stdout).hexdigest()!=expected:continue
+  for block in process.stdout.decode('utf-8','replace').split('\n\n'):
+   fields={}
+   for line in block.splitlines():
+    if ': ' in line and not line.startswith(' '):key,value=line.split(': ',1);fields[key]=value
+   if fields.get('Package')!='sovel-desktop':continue
+   try:
+    raw=fields.get('X-Sovel-Release-Info','')
+    if len(raw)>65536:continue
+    item=json.loads(base64.b64decode(raw,validate=True));assert item['version']==fields['Version']
+    item['packageSha256']=fields['SHA256'];item['publicationSource']='Signed Sovel APT metadata';entries.append(item)
+   except (ValueError,KeyError,AssertionError):pass
+ return entries
+def main():
+ installed=read_json('/usr/share/sovel/release.json',{})
+ history=read_json('/var/lib/sovel/release-history.json',[])
+ publications=official_packages()
+ for item in history:
+  match=next((x for x in publications if x.get('version')==item.get('version')),None)
+  if match:item.update({k:v for k,v in match.items() if k in ('publishedAt','publicationSource','name','type','notes','builtAt')})
+ for item in reversed(history):
+  if item.get('version')==installed.get('version'):installed={**installed,**item};break
+ print(json.dumps({'installed':installed,'history':history,'releases':publications}))
+if __name__=='__main__':main()

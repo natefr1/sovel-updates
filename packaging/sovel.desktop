@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Sovel
+Comment=Sovel Desktop
+Exec=/usr/bin/sovel-session
+Type=Application
+DesktopNames=Sovel

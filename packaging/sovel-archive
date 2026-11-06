@@ -1,0 +1,261 @@
+#!/usr/bin/python3
+"""Inspect, test, create and extract archives without overwriting user files."""
+
+import ctypes as C
+import ctypes.util
+import errno
+import gzip
+import json
+import os
+from pathlib import Path, PurePosixPath
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+
+
+SUFFIXES = (".tar.gz", ".tar.xz", ".tgz", ".txz", ".tar", ".zip", ".7z", ".rar", ".gz")
+LIMIT = 100_000
+CHUNK = 1024 * 1024
+
+
+def suffix(path):
+    return next((ext for ext in SUFFIXES if path.name.lower().endswith(ext)), "")
+
+
+def report(**fields):
+    print(json.dumps(fields, ensure_ascii=True), flush=True)
+
+
+def move_new(source, target):
+    # The no-replace operation prevents races with other Files windows.
+    if os.name == "nt":
+        source.rename(target)
+        return
+    rename = C.CDLL(None, use_errno=True).renameat2
+    rename.argtypes = [C.c_int, C.c_char_p, C.c_int, C.c_char_p, C.c_uint]
+    if rename(-100, os.fsencode(source), -100, os.fsencode(target), 1):
+        code = C.get_errno()
+        if code == errno.EEXIST:
+            raise FileExistsError(f"An item named {target.name!r} already exists.")
+        raise OSError(code, os.strerror(code), str(target))
+
+
+def entry_path(name):
+    path = PurePosixPath(name)
+    if path.is_absolute() or ".." in path.parts or "\\" in name or len(path.parts) > 100:
+        raise ValueError(f"Unsafe archive path: {name!r}")
+    return Path(*path.parts)
+
+
+class Archive:
+    def __init__(self, path):
+        self.library = C.CDLL(ctypes.util.find_library("archive") or "libarchive.so.13")
+        ptr = C.c_void_p
+        text = C.c_char_p
+        definitions = {
+            "read_new": (ptr, []),
+            "read_support_filter_all": (C.c_int, [ptr]),
+            "read_support_format_all": (C.c_int, [ptr]),
+            "read_open_filename": (C.c_int, [ptr, text, C.c_size_t]),
+            "read_add_passphrase": (C.c_int, [ptr, text]),
+            "read_next_header": (C.c_int, [ptr, C.POINTER(ptr)]),
+            "read_data": (C.c_ssize_t, [ptr, ptr, C.c_size_t]),
+            "read_data_skip": (C.c_int, [ptr]),
+            "entry_pathname": (text, [ptr]),
+            "entry_filetype": (C.c_uint, [ptr]),
+            "entry_size": (C.c_longlong, [ptr]),
+            "entry_hardlink": (text, [ptr]),
+            "error_string": (text, [ptr]),
+            "read_free": (C.c_int, [ptr]),
+        }
+        for name, (result, arguments) in definitions.items():
+            function = getattr(self.library, "archive_" + name)
+            function.restype = result
+            function.argtypes = arguments
+            setattr(self, name, function)
+        self.handle = self.read_new()
+        if not self.handle:
+            raise OSError("Cannot allocate an archive reader.")
+        try:
+            self.read_support_filter_all(self.handle)
+            self.read_support_format_all(self.handle)
+            password = sys.stdin.buffer.readline(8193).rstrip(b"\r\n")
+            if password:
+                self.check(self.read_add_passphrase(self.handle, password))
+            self.check(self.read_open_filename(self.handle, os.fsencode(path), CHUNK))
+        except BaseException:
+            self.close()
+            raise
+
+    def check(self, code):
+        if code < 0:
+            message = self.error_string(self.handle) or b"Archive read failed."
+            raise OSError(message.decode("utf-8", "replace"))
+        return code
+
+    def close(self):
+        self.read_free(self.handle)
+
+    def entries(self):
+        header = C.c_void_p()
+        while self.check(self.read_next_header(self.handle, C.byref(header))) != 1:
+            yield (
+                os.fsdecode(self.entry_pathname(header) or b""),
+                self.entry_filetype(header),
+                self.entry_size(header),
+                bool(self.entry_hardlink(header)),
+            )
+
+    def data(self):
+        buffer = C.create_string_buffer(CHUNK)
+        while count := self.check(self.read_data(self.handle, buffer, len(buffer))):
+            yield buffer.raw[:count]
+
+
+def transfer(chunks, output, budget):
+    count = 0
+    for block in chunks:
+        count += len(block)
+        if count > budget:
+            raise OSError("There is insufficient free space for this archive.")
+        if output:
+            output.write(block)
+    return count
+
+
+def unpack(source, action, stage=None):
+    entries = []
+    total = 0
+    budget = max(0, shutil.disk_usage(stage).free - 16 * CHUNK) if stage else float("inf")
+    if suffix(source) == ".gz":
+        name = source.name[:-3]
+        if action == "preview":
+            return [{"name": name, "bytes": None}]
+        with gzip.open(source, "rb") as compressed:
+            chunks = iter(lambda: compressed.read(CHUNK), b"")
+            if stage:
+                with (stage / entry_path(name)).open("xb") as output:
+                    total = transfer(chunks, output, budget)
+            else:
+                total = transfer(chunks, None, budget)
+        report(done=1, bytes=total, entry=name)
+        return []
+    archive = Archive(source)
+    try:
+        for index, (name, mode, size, hardlink) in enumerate(archive.entries(), 1):
+            if index > LIMIT:
+                raise ValueError("This archive exceeds the limit of 100,000 entries.")
+            if action == "preview":
+                entries.append({"name": name, "bytes": size, "directory": mode == stat.S_IFDIR})
+                if len(entries) == 500:
+                    report(truncated=True)
+                    break
+                archive.check(archive.read_data_skip(archive.handle))
+                continue
+            relative = entry_path(name)
+            if hardlink or mode not in (stat.S_IFDIR, stat.S_IFREG):
+                raise ValueError(f"Archive contains a link or special file: {name!r}")
+            if mode == stat.S_IFDIR:
+                if stage:
+                    (stage / relative).mkdir(parents=True, exist_ok=True)
+                continue
+            if not relative.parts:
+                raise ValueError("Archive contains an empty file name.")
+            if stage:
+                path = stage / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with path.open("xb") as output:
+                    total += transfer(archive.data(), output, budget - total)
+            else:
+                total += transfer(archive.data(), None, budget)
+            if index == 1 or index % 10 == 0:
+                report(done=index, bytes=total, entry=name)
+        return entries
+    finally:
+        archive.close()
+
+
+def extract(source, destination, new_folder):
+    if not destination.is_dir():
+        raise ValueError("Choose an existing destination folder.")
+    with tempfile.TemporaryDirectory(prefix=".sovel-extract-", dir=destination) as temporary:
+        stage = Path(temporary) / "contents"
+        stage.mkdir()
+        unpack(source, "extract", stage)
+        if new_folder:
+            name = source.name[:-len(suffix(source))]
+            if not name or name in (".", ".."):
+                name = "Extracted archive"
+            target = destination / name
+            move_new(stage, target)
+        else:
+            items = sorted(stage.iterdir())
+            for item in items:
+                target = destination / item.name
+                if target.exists() or target.is_symlink():
+                    raise FileExistsError(f"An item named {item.name!r} already exists. Try a new folder.")
+            moved = []
+            try:
+                for item in items:
+                    move_new(item, destination / item.name)
+                    moved.append(item.name)
+            except OSError:
+                for name in reversed(moved):
+                    move_new(destination / name, stage / name)
+                raise
+            target = destination
+        report(destination=str(target))
+
+
+def create(destination, files, level):
+    ext = suffix(destination)
+    if not ext or ext == ".rar" or not files:
+        raise ValueError("Choose ZIP, 7Z, TAR, TAR.GZ, TAR.XZ or GZ.")
+    if not 0 <= level <= 9:
+        raise ValueError("Compression level must be between 0 and 9.")
+    parent = files[0].parent
+    if any(path.parent != parent or not path.exists() for path in files):
+        raise ValueError("Choose existing items in one folder.")
+    for path in files:
+        if path.is_dir() and destination.parent.resolve().is_relative_to(path.resolve()):
+            raise ValueError("An archive cannot be created inside a folder it contains.")
+    with tempfile.TemporaryDirectory(prefix=".sovel-compress-", dir=destination.parent) as temporary:
+        output = Path(temporary) / ("archive" + ext)
+        if ext == ".gz":
+            if len(files) != 1 or not files[0].is_file():
+                raise ValueError("GZ compresses one file. Use TAR.GZ for multiple items.")
+            with files[0].open("rb") as source, gzip.open(output, "wb", compresslevel=level) as compressed:
+                shutil.copyfileobj(source, compressed, CHUNK)
+        else:
+            options = ["--options", f"compression-level={level}"] if ext not in (".tar", ".7z") else []
+            subprocess.run(["bsdtar", "-a", "-cf", str(output), *options, "-C", str(parent),
+                            "--", *(path.name for path in files)], check=True)
+        move_new(output, destination)
+    report(destination=str(destination))
+
+
+def main():
+    action, file, *args = sys.argv[1:]
+    path = Path(file).absolute()
+    if action == "create":
+        create(path, [Path(value).absolute() for value in args[1:]], int(args[0]))
+        return
+    if not path.is_file() or not suffix(path):
+        raise ValueError("Choose a supported archive.")
+    if action == "extract":
+        destination, placement = args
+        extract(path, Path(destination).resolve(strict=True), placement == "new")
+    elif action in ("preview", "test"):
+        report(entries=unpack(path, action))
+    else:
+        raise ValueError("Unsupported archive action.")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        print(str(error), file=sys.stderr)
+        sys.exit(1)

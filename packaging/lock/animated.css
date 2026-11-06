@@ -1,0 +1,6 @@
+@import url("style.css");
+@keyframes quiet-room {
+    from { background-size: 108% 108%; background-position: 45% 50%; }
+    to { background-size: 112% 112%; background-position: 55% 48%; }
+}
+window { animation: quiet-room 28s ease-in-out infinite alternate; }

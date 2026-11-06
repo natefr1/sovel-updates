@@ -1,0 +1,18 @@
+#!/usr/bin/python3
+"""Collect facts needed to verify capture and diagnose real voice underruns."""
+import json,subprocess,os
+checks={
+ 'session':['printenv','XDG_CURRENT_DESKTOP','XDG_SESSION_TYPE','WAYLAND_DISPLAY'],
+ 'audio':['wpctl','status'],
+ 'audio_clock':['pw-metadata','-n','settings'],
+ 'portal':['gdbus','introspect','--session','--dest','org.freedesktop.portal.Desktop','--object-path','/org/freedesktop/portal/desktop'],
+ 'audio_logs':['journalctl','--user','-b','--no-pager','-n','100','-u','pipewire','-u','pipewire-pulse','-u','wireplumber'],
+ 'capture_logs':['journalctl','--user','-b','--no-pager','-n','80','-u','xdg-desktop-portal','-u','xdg-desktop-portal-wlr'],
+ 'fonts':['fc-match','Noto Sans CJK JP'],
+ 'input':['fcitx5-remote','-n']}
+result={}
+for name,args in checks.items():
+ try:
+  p=subprocess.run(args,capture_output=True,text=True,timeout=15);result[name]={'exit':p.returncode,'stdout':p.stdout,'stderr':p.stderr}
+ except (OSError,subprocess.TimeoutExpired) as e:result[name]={'error':str(e)}
+print(json.dumps(result,ensure_ascii=False,indent=2))

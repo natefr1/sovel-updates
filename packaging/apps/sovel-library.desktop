@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=App Library
+Exec=/usr/bin/sovel --app library
+Icon=sovel-library
+Terminal=false
+Categories=Utility;
+StartupNotify=true

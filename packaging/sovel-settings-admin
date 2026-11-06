@@ -1,0 +1,42 @@
+#!/usr/bin/python3 -I
+"""Small authenticated system-settings boundary; no arbitrary commands or paths."""
+import json,os,pwd,re,subprocess,sys,zoneinfo
+def run(args):
+ result=subprocess.run(args,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=15,env={**os.environ,'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LC_ALL':'C.UTF-8'})
+ if result.returncode:raise ValueError(result.stderr.strip()[:300] or 'The system service rejected the change.')
+ return result.stdout.strip()
+def validate(operation,payload):
+ fields={'set-hostname':{'name'},'set-timezone':{'zone'},'set-ntp':{'enabled'},'set-full-name':{'name'},'firewall-status':set(),'set-firewall':{'enabled','keepSSH'}}
+ if operation not in fields or set(payload)-fields[operation]:raise ValueError('Unsupported system-settings request.')
+ if operation=='set-hostname' and (not isinstance(payload.get('name'),str) or not re.fullmatch(r'[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?',payload['name'])):raise ValueError('Use a computer name of 1–63 letters, numbers or hyphens.')
+ if operation=='set-timezone' and (not isinstance(payload.get('zone'),str) or payload['zone'] not in zoneinfo.available_timezones()):raise ValueError('Choose a valid time zone.')
+ if operation in ('set-ntp','set-firewall') and not isinstance(payload.get('enabled'),bool):raise ValueError('Choose an explicit on/off state.')
+ if operation=='set-firewall' and not isinstance(payload.get('keepSSH',True),bool):raise ValueError('Invalid remote-access preference.')
+ if operation=='set-full-name':
+  value=payload.get('name','')
+  if not isinstance(value,str) or not value.strip() or len(value)>80 or re.search(r'[\x00-\x1f\x7f:,]',value):raise ValueError('Use a display name without control characters, commas or colons.')
+ return payload
+def perform(operation,payload):
+ validate(operation,payload)
+ if operation=='set-hostname':run(['hostnamectl','set-hostname',payload['name']]);return {'message':'Computer name updated.'}
+ if operation=='set-timezone':run(['timedatectl','set-timezone',payload['zone']]);return {'message':'Time zone updated.'}
+ if operation=='set-ntp':run(['timedatectl','set-ntp','true' if payload['enabled'] else 'false']);return {'message':'Network-time preference updated.'}
+ if operation=='set-full-name':
+  caller=os.environ.get('PKEXEC_UID','')
+  if not caller.isdigit() or int(caller)==0:raise ValueError('The requesting local account could not be identified.')
+  user=pwd.getpwuid(int(caller));run(['usermod','--comment',payload['name'],user.pw_name]);return {'message':'Your display name was updated.'}
+ if operation=='firewall-status':return {'message':'Firewall status read with administrator approval.','rows':[{'label':'Firewall','value':run(['ufw','status','verbose'])}]}
+ if operation=='set-firewall':
+  if payload['enabled'] and payload.get('keepSSH',True):run(['ufw','allow','OpenSSH'])
+  run(['ufw','--force','enable'] if payload['enabled'] else ['ufw','disable']);return {'message':'Firewall configuration updated.'}
+ raise ValueError('Unsupported operation.')
+def main():
+ if os.geteuid()!=0:raise ValueError('System settings require administrator approval.')
+ data=sys.stdin.buffer.read(16385)
+ if len(data)>16384:raise ValueError('The settings request is too large.')
+ payload=json.loads(data or b'{}')
+ if not isinstance(payload,dict):raise ValueError('Invalid settings request.')
+ print(json.dumps(perform(sys.argv[1] if len(sys.argv)>1 else '',payload)),flush=True)
+if __name__=='__main__':
+ try:main()
+ except (ValueError,KeyError,OSError,subprocess.SubprocessError,json.JSONDecodeError) as error:print(json.dumps({'error':str(error)[:400]}),flush=True);sys.exit(1)

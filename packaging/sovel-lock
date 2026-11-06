@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+# gtklock owns real ext-session-lock surfaces and delegates authentication to PAM.
+command -v gtklock >/dev/null || { echo 'Sovel: secure locker not installed' >&2; exit 1; }
+test -n "${XDG_RUNTIME_DIR:-}" || { echo 'Sovel: no session runtime' >&2; exit 1; }
+style=/usr/share/sovel/lock/animated.css
+preferences="${XDG_CONFIG_HOME:-$HOME/.config}/Sovel/Desktop.conf"
+if test -r "$preferences" && grep -q '^reduced=true$' "$preferences"; then
+    style=/usr/share/sovel/lock/style.css
+fi
+export GDK_BACKEND=wayland
+exec flock --nonblock --conflict-exit-code 0 "$XDG_RUNTIME_DIR/sovel-lock.guard" gtklock --config /usr/share/sovel/lock/config.ini --style "$style"

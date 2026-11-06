@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+ <vendor>Sovel</vendor>
+ <action id="org.sovel.settings.system">
+  <description>Change Sovel system settings</description>
+  <message>Administrator approval is required for this system setting.</message>
+  <defaults><allow_any>auth_admin</allow_any><allow_inactive>auth_admin</allow_inactive><allow_active>auth_admin_keep</allow_active></defaults>
+  <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/sovel-settings-admin</annotate>
+ </action>
+</policyconfig>

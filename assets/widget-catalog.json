@@ -1,0 +1,306 @@
+[
+  {
+    "type": "calendar",
+    "name": "Calendar",
+    "group": "Productivity",
+    "icon": "clock",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "todo",
+    "name": "To-Do List",
+    "group": "Productivity",
+    "icon": "widgets",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "notes",
+    "name": "Notes",
+    "group": "Productivity",
+    "icon": "apps",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "reminders",
+    "name": "Reminders",
+    "group": "Productivity",
+    "icon": "notifications",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "timer",
+    "name": "Timer",
+    "group": "Productivity",
+    "icon": "clock",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "calculator",
+    "name": "Calculator",
+    "group": "Productivity",
+    "icon": "apps",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "cpu",
+    "name": "CPU Usage",
+    "group": "System",
+    "icon": "developer",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "gpu",
+    "name": "GPU Usage",
+    "group": "System",
+    "icon": "display",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "ram",
+    "name": "Memory",
+    "group": "System",
+    "icon": "developer",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "storage",
+    "name": "Storage",
+    "group": "System",
+    "icon": "storage",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "network",
+    "name": "Network Activity",
+    "group": "System",
+    "icon": "network",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "battery",
+    "name": "Battery",
+    "group": "System",
+    "icon": "power",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "system",
+    "name": "System Overview",
+    "group": "System",
+    "icon": "developer",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "weather",
+    "name": "Weather",
+    "group": "Information",
+    "icon": "display",
+    "network": true,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "clock",
+    "name": "Digital Clock",
+    "group": "Information",
+    "icon": "clock",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "analog",
+    "name": "Analog Clock",
+    "group": "Information",
+    "icon": "clock",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "world",
+    "name": "World Clock",
+    "group": "Information",
+    "icon": "language",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "date",
+    "name": "Date",
+    "group": "Information",
+    "icon": "clock",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "events",
+    "name": "Upcoming Events",
+    "group": "Information",
+    "icon": "clock",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "media",
+    "name": "Music Controls",
+    "group": "Media & Sovel",
+    "icon": "sound",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "jared",
+    "name": "JARED Action Queue",
+    "group": "Media & Sovel",
+    "icon": "jared",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "projects-deck",
+    "name": "Project Command Deck",
+    "group": "Productivity",
+    "icon": "files",
+    "network": false,
+    "sizes": ["small", "medium", "large"]
+  },
+  {
+    "type": "ai-monitor",
+    "name": "AI Performance Monitor",
+    "group": "System",
+    "icon": "system",
+    "network": false,
+    "sizes": ["small", "medium", "large"]
+  },
+  {
+    "type": "downloads",
+    "name": "Downloads",
+    "group": "Media & Sovel",
+    "icon": "updates",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "updates",
+    "name": "Software Updates",
+    "group": "Media & Sovel",
+    "icon": "updates",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  },
+  {
+    "type": "actions",
+    "name": "Quick Settings",
+    "group": "Media & Sovel",
+    "icon": "settings",
+    "network": false,
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ]
+  }
+]

@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://raw.githubusercontent.com/natefr1/sovel-updates/main/apt
+Suites: stable
+Components: main
+Architectures: amd64
+Signed-By: /usr/share/keyrings/sovel-updates-archive-keyring.gpg

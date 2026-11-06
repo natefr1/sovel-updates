@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=JARED
+Comment=Local conversations and approved Sovel actions
+Exec=sovel --app jared
+Icon=sovel-jared
+Terminal=false
+Categories=Utility;
+StartupWMClass=sovel-jared

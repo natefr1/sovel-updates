@@ -1,0 +1,22 @@
+#!/bin/sh
+set -eu
+rendering=auto
+if test -r /etc/sovel/rendering; then
+  rendering=$(cat /etc/sovel/rendering)
+fi
+if test -r /proc/cmdline; then
+  for option in $(cat /proc/cmdline); do
+    case "$option" in sovel.renderer=*) rendering=${option#sovel.renderer=} ;; esac
+  done
+fi
+case "$rendering" in
+  auto) ;;
+  software) export WLR_RENDERER=pixman QT_QUICK_BACKEND=software ;;
+  software-gl) export WLR_RENDERER=pixman QT_QUICK_BACKEND=rhi LIBGL_ALWAYS_SOFTWARE=1 QSG_RHI_BACKEND=opengl ;;
+  *) echo 'Sovel: invalid /etc/sovel/rendering (expected auto, software or software-gl)' >&2; exit 2 ;;
+esac
+export QT_QPA_PLATFORM=wayland
+export QT_QUICK_CONTROLS_STYLE=Basic
+export SOVEL_GREETER_KIOSK=1
+unset QT_WAYLAND_SHELL_INTEGRATION
+exec cage -s -- /usr/bin/sovel --greeter

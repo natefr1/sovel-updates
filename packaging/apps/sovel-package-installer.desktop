@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Package Installer
+Comment=Review and install downloaded Debian packages
+Exec=sovel --install-package %f
+Icon=system-software-install
+MimeType=application/vnd.debian.binary-package;application/x-deb;
+Categories=System;PackageManager;
+NoDisplay=true

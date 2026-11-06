@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs><linearGradient id="glass" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#f6eaff"/><stop offset="1" stop-color="#c6b1e3"/></linearGradient></defs>
+  <path fill="url(#glass)" d="M26 18h78L89 36H34c-7 0-10 3-10 8s3 8 10 8h20c6 0 10 3 14 9l15 24 14-30h25l-27 54c-2 5-6 7-11 7h-7c-5 0-8-2-11-7L40 71H29C14 71 4 61 4 45c0-12 5-21 14-27z"/>
+</svg>

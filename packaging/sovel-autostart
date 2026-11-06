@@ -1,0 +1,37 @@
+#!/bin/sh
+set -eu
+dbus-update-activation-environment --systemd DISPLAY XAUTHORITY WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE 2>/dev/null || true
+# Keep agents scoped to this graphical session and avoid duplicate instances.
+agent_pids=""
+cleanup(){ for agent_pid in $agent_pids; do kill "$agent_pid" 2>/dev/null || true; done; }
+trap cleanup EXIT
+trap 'exit 0' HUP INT TERM
+start_agent(){
+    agent_program=$1
+    shift
+    if command -v "$agent_program" >/dev/null 2>&1 && ! pgrep -u "$(id -u)" -f "(^|/)$agent_program( |$)" >/dev/null 2>&1; then
+        "$agent_program" "$@" >/dev/null 2>&1 &
+        agent_pids="$agent_pids $!"
+    fi
+}
+# Normal Wi-Fi/VPN, privilege authorization, and Bluetooth passkey dialogs.
+start_agent nm-applet --indicator
+start_agent lxqt-policykit-agent
+start_agent blueman-applet
+/usr/libexec/sovel-session-services >/dev/null 2>&1 || true
+notification_config="${XDG_CONFIG_HOME:-$HOME/.config}/Sovel/mako/config"
+if test -r "$notification_config"; then
+    start_agent mako --config "$notification_config"
+else
+    start_agent mako --background-color "#241830dd" --text-color "#f5edff" --border-color "#b99be0" --border-radius 14 --font "Noto Sans 10"
+fi
+printf '{}' | /usr/libexec/sovel-settings-helper apply-preferences >/dev/null 2>&1 || true
+/usr/libexec/sovel-default-handlers >/dev/null 2>&1 || true
+/usr/bin/sovel --desktop &
+shell_pid=$!
+printf '{}' | /usr/libexec/sovel-settings-helper run-startup >/dev/null 2>&1 || true
+# A freshly booted USB goes straight into the full setup assistant.
+if test -f /etc/sovel/live-image; then /usr/bin/sovel-setup >/tmp/sovel-setup.log 2>&1 & fi
+# A dead desktop exits the session rather than leaving an invisible login.
+wait "$shell_pid" || true
+labwc --exit

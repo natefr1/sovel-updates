@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<labwc_config>
+  <core><decoration>server</decoration><gap>12</gap><autoEnableOutputs>yes</autoEnableOutputs></core>
+  <theme><cornerRadius>18</cornerRadius><font place="ActiveWindow" name="sans" size="10"/></theme>
+  <desktops number="4"><prefix>Space</prefix></desktops>
+  <keyboard>
+    <keybind key="A-Tab"><action name="NextWindow"/></keybind>
+    <keybind key="A-F4"><action name="Close"/></keybind>
+    <keybind key="W-j"><action name="Execute" command="sovel --app jared"/></keybind>
+    <keybind key="W-S-j"><action name="Execute" command="sovel --downloads"/></keybind>
+    <keybind key="W-S-s"><action name="Execute" command="/usr/bin/sovel-screenshot"/></keybind>
+    <keybind key="W-e"><action name="Execute" command="/usr/bin/sovel --app files"/></keybind>
+    <keybind key="W-i"><action name="Execute" command="/usr/bin/sovel --app settings"/></keybind>
+    <keybind key="W-Return"><action name="Execute" command="foot"/></keybind>
+    <keybind key="W-l"><action name="Execute" command="/usr/bin/sovel-lock"/></keybind>
+    <keybind key="W-Escape"><action name="Execute" command="/usr/bin/sovel --release-shell-input"/></keybind>
+    <keybind key="W-Left"><action name="SnapToEdge" direction="left"/></keybind>
+    <keybind key="W-Right"><action name="SnapToEdge" direction="right"/></keybind>
+    <keybind key="W-S-Left"><action name="MoveToOutput" direction="left"/></keybind>
+    <keybind key="W-S-Right"><action name="MoveToOutput" direction="right"/></keybind>
+    <keybind key="W-S-Up"><action name="MoveToOutput" direction="up"/></keybind>
+    <keybind key="W-S-Down"><action name="MoveToOutput" direction="down"/></keybind>
+  </keyboard>
+  <mouse>
+    <context name="TitleBar"><mousebind button="Left" action="Drag"><action name="Move"/></mousebind><mousebind button="Left" action="DoubleClick"><action name="ToggleMaximize"/></mousebind></context>
+    <context name="Frame"><mousebind button="A-Left" action="Drag"><action name="Move"/></mousebind><mousebind button="A-Right" action="Drag"><action name="Resize"/></mousebind></context>
+    <context name="Client"><mousebind button="Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind></context>
+    <context name="Close"><mousebind button="Left" action="Click"><action name="Close"/></mousebind></context>
+    <context name="Maximize"><mousebind button="Left" action="Click"><action name="ToggleMaximize"/></mousebind></context>
+    <context name="Iconify"><mousebind button="Left" action="Click"><action name="Iconify"/></mousebind></context>
+  </mouse>
+</labwc_config>

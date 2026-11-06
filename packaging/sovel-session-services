@@ -1,0 +1,18 @@
+#!/usr/bin/python3
+"""Start the matching user services; never run a GNOME capture backend on Labwc."""
+import configparser,os,subprocess
+from pathlib import Path
+def run(args):return subprocess.run(args,check=False,capture_output=True,text=True,timeout=20)
+run(['systemctl','--user','import-environment','WAYLAND_DISPLAY','DISPLAY','XDG_CURRENT_DESKTOP','XDG_SESSION_TYPE','GTK_IM_MODULE','QT_IM_MODULE','XMODIFIERS'])
+run(['systemctl','--user','start','pipewire.socket','pipewire-pulse.socket','wireplumber.service'])
+run(['systemctl','--user','start','xdg-desktop-portal.service'])
+# Existing input-method choices win. A fresh Sovel session defaults to Fcitx5.
+if os.environ.get('QT_IM_MODULE')=='fcitx':
+ profile=Path.home()/'.config/fcitx5/profile'
+ if not profile.exists():
+  profile.parent.mkdir(parents=True,exist_ok=True)
+  text='[Groups/0]\nName=Default\nDefault Layout=us\nDefaultIM=mozc\n'
+  for i,name in enumerate(['keyboard-us','mozc','pinyin','hangul','m17n_hi_itrans','keyboard-ara','keyboard-ru']):
+   text+=f'\n[Groups/0/Items/{i}]\nName={name}\nLayout=\n'
+  profile.write_text(text+'\n[GroupOrder]\n0=Default\n',encoding='utf-8')
+ if run(['pgrep','-u',str(os.getuid()),'-x','fcitx5']).returncode:subprocess.Popen(['fcitx5','-d'],start_new_session=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)

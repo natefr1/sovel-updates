@@ -1,0 +1,12 @@
+#!/usr/bin/python3
+import json,os,socket
+from pathlib import Path
+runtime=os.environ.get('XDG_RUNTIME_DIR')
+if runtime:
+    for path in Path(runtime).glob('waypaper-mpv-*.sock'):
+        try:
+            with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as client:
+                client.settimeout(1);client.connect(str(path));client.sendall((json.dumps({'command':['quit']})+'\n').encode())
+            path.unlink(missing_ok=True)
+        except OSError:
+            pass

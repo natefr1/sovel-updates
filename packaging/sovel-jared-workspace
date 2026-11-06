@@ -1,0 +1,521 @@
+#!/usr/bin/python3
+"""Local productivity workspaces and bounded, user-directed document access."""
+
+import datetime
+import fcntl
+import hashlib
+import html.parser
+import ipaddress
+import json
+import os
+from pathlib import Path
+import re
+import socket
+import sqlite3
+import subprocess
+import sys
+import tempfile
+import time
+import uuid
+from urllib.parse import quote, urlsplit
+
+
+DATA = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "Sovel" / "JaredWorkspace"
+MAX_TEXT = 80_000
+VOICE_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin"
+VOICE_HASH = "921e4cf8686fdd993dcd081a5da5b6c365bfde1162e72b08d75ac75289920b1f"
+PIPER_REQUIREMENTS = """piper-tts==1.8.0 --hash=sha256:25b4d3f31ff70c8fa7151908e00aaa5650cbdf16bca8fcf21299f3941b89a7d3
+onnxruntime==1.31.1 --hash=sha256:c20d7f15d84427db070b163f78c2c7146cc93edd6113fa7327671259a24184fe
+numpy==2.5.4 --hash=sha256:d549420b8858885cea8838a727842249218b9c1da24dd517e25c9c7a948310a3
+flatbuffers==25.12.19 --hash=sha256:7634f50c427838bb021c2d66a3d1168e9d199b0607e6329399f04846d42e20b4
+pathvalidate==3.3.1 --hash=sha256:5263baab691f8e1af96092fa5137ee17df5bdfbd6cff1fcac4d6ef4bc2e1735f
+packaging==26.3 --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c
+protobuf==7.36.2 --hash=sha256:89f23aa53c24553a2416fd4fd1ec06f74fa42b14b546d8883128813f775bbfd2
+"""
+
+
+def now():
+    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+
+
+def text(request, key, limit=160, required=True):
+    value = request.get(key, "")
+    if not isinstance(value, str) or len(value) > limit or "\0" in value or (required and not value.strip()):
+        raise ValueError(f"Provide a valid {key}.")
+    return value.strip()
+
+
+def database():
+    DATA.mkdir(mode=0o700, parents=True, exist_ok=True)
+    database_file = DATA / "workspace.sqlite3"
+    db = sqlite3.connect(database_file, timeout=4)
+    database_file.chmod(0o600)
+    db.row_factory = sqlite3.Row
+    db.executescript("""
+        PRAGMA foreign_keys=ON;
+        CREATE TABLE IF NOT EXISTS projects (
+          id INTEGER PRIMARY KEY, name TEXT NOT NULL, path TEXT NOT NULL UNIQUE,
+          created TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS notes (
+          id INTEGER PRIMARY KEY, title TEXT NOT NULL, body TEXT NOT NULL,
+          folder TEXT NOT NULL DEFAULT '', project INTEGER REFERENCES projects(id),
+          modified TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS tasks (
+          id INTEGER PRIMARY KEY, title TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0,
+          project INTEGER NOT NULL REFERENCES projects(id)
+        );
+        CREATE TABLE IF NOT EXISTS research (
+          id INTEGER PRIMARY KEY, title TEXT NOT NULL, url TEXT NOT NULL,
+          body TEXT NOT NULL DEFAULT '', project INTEGER REFERENCES projects(id),
+          created TEXT NOT NULL
+        );
+    """)
+    return db
+
+
+def records(db, table, field):
+    return [dict(row) for row in db.execute(f"SELECT * FROM {table} ORDER BY {field} DESC, id DESC LIMIT 200")]
+
+
+def snapshot(db):
+    # Full note content is loaded only when explicitly opened.
+    notes = [dict(row) for row in db.execute(
+        "SELECT id,title,folder,project,modified,substr(body,1,180) AS excerpt FROM notes ORDER BY modified DESC LIMIT 200"
+    )]
+    research = [dict(row) for row in db.execute(
+        "SELECT id,title,url,project,created,substr(body,1,180) AS excerpt FROM research ORDER BY created DESC LIMIT 200"
+    )]
+    return {"notes": notes, "projects": records(db, "projects", "created"),
+            "research": research, "tasks": records(db, "tasks", "id")}
+
+
+def project_id(db, request, required=False):
+    value = int(request.get("project", 0) or 0)
+    if value and db.execute("SELECT 1 FROM projects WHERE id=?", (value,)).fetchone():
+        return value
+    if required or value:
+        raise ValueError("Choose an existing project.")
+    return None
+
+
+def safe_root(value):
+    root = Path(value).expanduser().resolve(strict=True)
+    home = Path.home().resolve()
+    if root == home or not root.is_relative_to(home) or not root.is_dir():
+        raise ValueError("Choose a specific folder in your home directory.")
+    if any(part.startswith(".") for part in root.relative_to(home).parts):
+        raise ValueError("Hidden folders cannot be indexed by JARED.")
+    return root
+
+
+def roots(db, request):
+    supplied = request.get("roots", [])
+    if not isinstance(supplied, list) or len(supplied) > 24:
+        raise ValueError("Too many search locations.")
+    locations = supplied + [row["path"] for row in db.execute("SELECT path FROM projects LIMIT 100")]
+    result = []
+    for location in locations:
+        try:
+            root = safe_root(location)
+        except (OSError, ValueError):
+            continue
+        if root not in result:
+            result.append(root)
+    return result
+
+
+def search(db, request):
+    query = text(request, "query", 250).casefold()
+    project = project_id(db, request, required=bool(request.get("project")))
+    if project:
+        row = db.execute("SELECT path FROM projects WHERE id=?", (project,)).fetchone()
+        locations = [safe_root(row["path"])]
+    else:
+        locations = roots(db, request)
+    yesterday = bool(re.search(r"\byesterday\b", query))
+    today = bool(re.search(r"\btoday\b", query))
+    target_date = datetime.date.today() - datetime.timedelta(days=int(yesterday))
+    words = [word for word in re.findall(r"[\w.-]+", query) if word not in
+             {"the", "my", "a", "all", "files", "file", "i", "downloaded", "yesterday", "today", "latest", "recent"}]
+    words = ["pdf" if word == "pdfs" else word for word in words]
+    words = [re.sub(r"[^\w]+", "", word) for word in words]
+    words = [word for word in words if word]
+    if not words and not project:
+        raise ValueError("Enter a filename, extension or words to find.")
+    start = time.monotonic()
+    scanned = 0
+    matches = []
+    visited = set()
+    def results(truncated):
+        return {"matches": sorted(matches, key=lambda item: item["modified"], reverse=True)[:120],
+                "truncated": truncated or len(matches) > 120}
+
+    for root in locations:
+        for folder, dirs, names in os.walk(root, followlinks=False):
+            dirs[:] = [name for name in dirs if not name.startswith(".") and name not in
+                       {"node_modules", "venv", "build", "__pycache__"} and not (Path(folder) / name).is_symlink()]
+            for name in dirs + names:
+                scanned += 1
+                if scanned > 25_000 or time.monotonic() - start > 5:
+                    return results(True)
+                if name.startswith("."):
+                    continue
+                path = Path(folder) / name
+                if path in visited or path.is_symlink():
+                    continue
+                relative = str(path.relative_to(root)).casefold()
+                normalized = re.sub(r"[^\w]+", "", relative)
+                if (not words and path.is_dir()) or not all(word in normalized for word in words):
+                    continue
+                try:
+                    metadata = path.stat()
+                except OSError:
+                    continue
+                if (yesterday or today) and datetime.date.fromtimestamp(metadata.st_mtime) != target_date:
+                    continue
+                visited.add(path)
+                matches.append({"name": name, "path": str(path), "folder": path.is_dir(),
+                                "modified": metadata.st_mtime, "bytes": metadata.st_size})
+    return results(False)
+
+
+def approved_file(db, request):
+    path = Path(text(request, "path", 4096)).resolve(strict=True)
+    if not any(path == root or path.is_relative_to(root) for root in roots(db, request)):
+        raise ValueError("This item is outside JARED's search locations.")
+    return path
+
+
+def web_url(value):
+    url = urlsplit(value)
+    if (url.scheme != "https" or not url.hostname or url.username or url.password
+            or url.port not in (None, 443) or any(ord(char) < 33 for char in value)):
+        raise ValueError("Use a public HTTPS article address.")
+    return url
+
+
+class Article(html.parser.HTMLParser):
+    blocked = {"script", "style", "noscript", "nav", "aside", "footer", "svg", "iframe", "template"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+        self.hidden = []
+        self.size = 0
+
+    def handle_starttag(self, tag, attributes):
+        if tag in self.blocked:
+            self.hidden.append(tag)
+
+    def handle_endtag(self, tag):
+        if self.hidden and self.hidden[-1] == tag:
+            self.hidden.pop()
+
+    def handle_data(self, value):
+        if not self.hidden and self.size < MAX_TEXT:
+            cleaned = " ".join(value.split())
+            if cleaned:
+                self.parts.append(cleaned)
+                self.size += len(cleaned)
+
+
+def article(value):
+    url = web_url(value)
+    host = url.hostname.encode("idna").decode("ascii")
+    addresses = {row[4][0] for row in socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)}
+    if not addresses or any(not ipaddress.ip_address(ip).is_global for ip in addresses):
+        raise ValueError("JARED only retrieves articles from public internet hosts.")
+    address = sorted(addresses, key=lambda ip: (":" in ip, ip))[0]
+    literal = f"[{address}]" if ":" in address else address
+    result = subprocess.run(
+        ["curl", "--disable", "--noproxy", "*", "--proto", "=https", "--fail", "--silent",
+         "--show-error", "--connect-timeout", "5", "--max-time", "15", "--max-filesize", "1500000",
+         "--resolve", f"{host}:443:{literal}", "--", value],
+        capture_output=True, timeout=18, check=True,
+    )
+    parser = Article()
+    parser.feed(result.stdout.decode("utf-8", "replace"))
+    body = "\n".join(parser.parts)[:MAX_TEXT]
+    if len(body) < 100:
+        raise ValueError("No readable article text was returned. Open the site in your browser.")
+    return body
+
+
+def download_voice():
+    folder = DATA / "voice"
+    folder.mkdir(mode=0o700, parents=True, exist_ok=True)
+    target = folder / "ggml-tiny.en.bin"
+    if target.is_file():
+        with target.open("rb") as source:
+            if hashlib.file_digest(source, "sha256").hexdigest() == VOICE_HASH:
+                return str(target)
+    with tempfile.TemporaryDirectory(prefix="voice-", dir=folder) as temporary:
+        staged = Path(temporary) / target.name
+        subprocess.run(["curl", "--disable", "--fail", "--silent", "--show-error", "--location",
+                        "--proto", "=https", "--proto-redir", "=https", "--max-time", "140",
+                        "--max-filesize", "80000000", "--output", str(staged), VOICE_URL],
+                       check=True, timeout=145)
+        with staged.open("rb") as source:
+            if hashlib.file_digest(source, "sha256").hexdigest() != VOICE_HASH:
+                raise ValueError("The speech model failed checksum verification.")
+        staged.chmod(0o600)
+        staged.replace(target)
+    return str(target)
+
+
+def install_piper():
+    if sys.version_info[:2] != (3, 14) or os.uname().machine != "x86_64":
+        raise ValueError("This Piper installer requires the Sovel x86-64 Python 3.14 runtime.")
+    folder = DATA / "voice"
+    folder.mkdir(mode=0o700, parents=True, exist_ok=True)
+    target = folder / "piper-1.8.0"
+    name = "en_US-lessac-low.onnx"
+    model = target / name
+    runtime = target / "venv/bin/python"
+    with (folder / ".piper-install.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise ValueError("Piper is already being installed.") from None
+        if runtime.is_file() and model.is_file() and model.with_suffix(".onnx.json").is_file():
+            return {"voiceFile": str(model), "runtime": str(runtime)}
+        if target.exists():
+            raise ValueError("An incomplete Piper installation is already present in your Sovel voice folder.")
+        with tempfile.TemporaryDirectory(prefix="piper-", dir=folder) as temporary:
+            stage = Path(temporary) / "install"
+            stage.mkdir(mode=0o700)
+            subprocess.run([sys.executable, "-m", "venv", str(stage / "venv")],
+                           check=True, timeout=60, stdout=subprocess.DEVNULL)
+            requirements = Path(temporary) / "requirements.txt"
+            requirements.write_text(PIPER_REQUIREMENTS, encoding="utf-8")
+            subprocess.run([str(stage / "venv/bin/python"), "-m", "pip", "--isolated", "install",
+                            "--disable-pip-version-check", "--no-cache-dir", "--only-binary=:all:",
+                            "--index-url", "https://pypi.org/simple", "--require-hashes", "-r", str(requirements)],
+                           check=True, timeout=230, stdout=subprocess.DEVNULL)
+            source = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/low/"
+            assets = ((name, 64_000_000, "f7d01dde371555732c4c314111ac79672b1a5ce2fc19266ab42178fd8df7f375"),
+                      (name + ".json", 10_000, "45754dfdebb3b8661c3fc564713772deec6e064feeb5b4e9594857dc7305193a"))
+            for filename, limit, checksum in assets:
+                destination = stage / filename
+                subprocess.run(["curl", "--disable", "--fail", "--silent", "--show-error", "--location",
+                                "--proto", "=https", "--proto-redir", "=https", "--max-time", "240",
+                                "--max-filesize", str(limit), "--output", str(destination), source + filename],
+                               check=True, timeout=250)
+                with destination.open("rb") as contents:
+                    if hashlib.file_digest(contents, "sha256").hexdigest() != checksum:
+                        raise ValueError("The Piper voice failed checksum verification.")
+            stage.rename(target)
+    return {"voiceFile": str(model), "runtime": str(runtime)}
+
+
+def command(db, action, request):
+    result = {}
+    if action == "note-save":
+        title = text(request, "title")
+        body = text(request, "body", MAX_TEXT, False)
+        folder = text(request, "folder", 160, False)
+        project = project_id(db, request)
+        identifier = int(request.get("id", 0) or 0)
+        if identifier:
+            cursor = db.execute("UPDATE notes SET title=?,body=?,folder=?,project=?,modified=? WHERE id=?",
+                                (title, body, folder, project, now(), identifier))
+            if cursor.rowcount != 1:
+                raise ValueError("This note no longer exists.")
+        else:
+            cursor = db.execute("INSERT INTO notes(title,body,folder,project,modified) VALUES(?,?,?,?,?)",
+                                (title, body, folder, project, now()))
+            identifier = cursor.lastrowid
+        result = {"id": identifier, "record": {"savedNoteId": identifier},
+                  "message": f"Saved note “{title}” in JARED → Notes."}
+    elif action in ("note-read", "research-read"):
+        table = "notes" if action == "note-read" else "research"
+        row = db.execute(f"SELECT * FROM {table} WHERE id=?", (int(request["id"]),)).fetchone()
+        if not row:
+            raise ValueError("This item no longer exists.")
+        result = {"record": dict(row)}
+    elif action == "project-add":
+        path = safe_root(text(request, "path", 4096))
+        name = text(request, "name", 160, False) or path.name
+        db.execute("INSERT INTO projects(name,path,created) VALUES(?,?,?) ON CONFLICT(path) DO UPDATE SET name=excluded.name",
+                   (name, str(path), now()))
+        result = {"message": f"Added project “{name}”."}
+    elif action == "task-add":
+        title = text(request, "title", 400)
+        db.execute("INSERT INTO tasks(title,project) VALUES(?,?)", (title, project_id(db, request, True)))
+        result = {"message": "Added the project task."}
+    elif action == "task-extract":
+        project = project_id(db, request, True)
+        path = approved_file(db, request)
+        if not path.is_file() or path.suffix.lower() not in (".md", ".txt", ".rst"):
+            raise ValueError("Choose a Markdown or plain-text note.")
+        with path.open("rb") as source:
+            content = source.read(512 * 1024 + 1)
+        if len(content) > 512 * 1024:
+            raise ValueError("Choose a note smaller than 512 KiB.")
+        pattern = re.compile(r"^\s*(?:(?:[-*+]\s+|\d+[.)]\s+)\[ \]|(?:[-*+]\s+)?TODO:)\s*(\S.*)$",
+                             re.IGNORECASE)
+        candidates = []
+        seen = {row["title"].casefold() for row in db.execute("SELECT title FROM tasks WHERE project=?", (project,))}
+        for line in content.decode("utf-8-sig").splitlines():
+            match = pattern.match(line)
+            if not match:
+                continue
+            title = match[1].strip()
+            if not 0 < len(title) <= 160 or title.casefold() in seen:
+                continue
+            candidates.append(title)
+            seen.add(title.casefold())
+            if len(candidates) == 6:
+                break
+        name = db.execute("SELECT name FROM projects WHERE id=?", (project,)).fetchone()["name"]
+        result = {"tasks": candidates, "project": project, "projectName": name}
+    elif action == "task-add-list":
+        project = project_id(db, request, True)
+        tasks = request.get("tasks")
+        if not isinstance(tasks, list) or not 1 <= len(tasks) <= 6:
+            raise ValueError("Review one to six project tasks.")
+        titles = [text({"title": title}, "title", 160) for title in tasks]
+        db.execute("BEGIN IMMEDIATE")
+        seen = {row["title"].casefold() for row in db.execute("SELECT title FROM tasks WHERE project=?", (project,))}
+        added = 0
+        for title in titles:
+            if title.casefold() in seen:
+                continue
+            db.execute("INSERT INTO tasks(title,project) VALUES(?,?)", (title, project))
+            seen.add(title.casefold())
+            added += 1
+        result = {"message": f"Added {added} new project tasks."}
+    elif action == "task-set":
+        if not isinstance(request.get("done"), bool):
+            raise ValueError("Choose a task completion state.")
+        updated = db.execute("UPDATE tasks SET done=? WHERE id=?", (int(request["done"]), int(request["id"])))
+        if updated.rowcount != 1:
+            raise ValueError("This task no longer exists.")
+        result = {"message": "Updated the task."}
+    elif action == "task-toggle":
+        db.execute("UPDATE tasks SET done=1-done WHERE id=?", (int(request["id"]),))
+        result = {"message": "Updated the task."}
+    elif action == "research-save":
+        url = text(request, "url", 4096)
+        web_url(url)
+        title = text(request, "title", 160, False) or urlsplit(url).hostname
+        body = text(request, "body", MAX_TEXT, False)
+        db.execute("INSERT INTO research(title,url,body,project,created) VALUES(?,?,?,?,?)",
+                   (title, url, body, project_id(db, request), now()))
+        result = {"message": f"Saved research “{title}”."}
+    elif action == "web-search":
+        result = {"url": "https://duckduckgo.com/?q=" + quote(text(request, "query", 500))}
+    elif action == "article":
+        url = text(request, "url", 4096)
+        result = {"body": article(url), "url": url}
+    elif action == "find":
+        result = search(db, request)
+    elif action == "project-summary":
+        project = project_id(db, request, True)
+        files = search(db, {"query": "recent", "project": project})["matches"]
+        result = {"project": project, "files": files[:6]}
+    elif action == "project-open":
+        name = text(request, "name", 160).casefold()
+        projects = db.execute("SELECT name,path FROM projects ORDER BY name LIMIT 200").fetchall()
+        exact = [row for row in projects if row["name"].casefold() == name]
+        matches = exact or [row for row in projects if name in row["name"].casefold()]
+        if len(matches) == 1:
+            path = safe_root(matches[0]["path"])
+            result = {"path": str(path), "projectName": matches[0]["name"]}
+        elif matches:
+            result = {"message": "Several saved projects match: " + ", ".join(row["name"] for row in matches[:8])}
+        else:
+            result = {"message": "I couldn't find that project. Add its folder from the Projects tab."}
+    elif action in ("open", "open-preview"):
+        path = approved_file(db, request)
+        result = {"path": str(path)}
+        if action == "open-preview":
+            if not path.is_file():
+                raise ValueError("Choose a file to preview on another display.")
+            result["display"] = text(request, "display", 128)
+    elif action == "folder-create":
+        parent = approved_file(db, request)
+        name = text(request, "name", 200)
+        if Path(name).name != name or name in (".", ".."):
+            raise ValueError("Choose a folder name without slashes.")
+        folder = parent / name
+        folder.mkdir()
+        result = {"message": "Created " + str(folder)}
+    elif action == "file-move":
+        source = approved_file(db, request)
+        destination = approved_file(db, dict(request, path=text(request, "destination", 4096)))
+        if not source.is_file() or not destination.is_dir():
+            raise ValueError("Choose an existing file and destination folder.")
+        state = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "Sovel" / "transfers"
+        state.mkdir(mode=0o700, parents=True, exist_ok=True)
+        identifier = uuid.uuid4().hex
+        job = state / (identifier + ".json")
+        descriptor = os.open(job, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            json.dump({"id": identifier, "state": "queued", "sources": [str(source)],
+                       "destination": str(destination), "move": True, "created": int(time.time())}, stream)
+        try:
+            subprocess.Popen([sys.executable, str(Path(__file__).with_name("sovel-transfer")), identifier],
+                             start_new_session=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+        except OSError:
+            job.unlink(missing_ok=True)
+            raise
+        result = {"message": "Queued the approved file move. Track it in Sovel Files → Transfers."}
+    elif action == "gpu":
+        query = subprocess.run(["nvidia-smi", "--query-gpu=name,utilization.gpu,memory.used,memory.total",
+                                "--format=csv,noheader,nounits"], capture_output=True, text=True,
+                               check=True, timeout=4)
+        output = []
+        for line in query.stdout.splitlines():
+            parts = [part.strip() for part in line.split(",")]
+            if len(parts) == 4:
+                output.append(f"{parts[0]}: {parts[1]}% GPU usage, {parts[2]} of {parts[3]} MiB VRAM used.")
+        result = {"message": "\n".join(output) or "The driver did not report GPU measurements."}
+    elif action == "wifi-connect":
+        name = text(request, "name")
+        listing = subprocess.run(["nmcli", "--terse", "--escape", "no", "--fields", "UUID,TYPE,NAME",
+                                  "connection", "show"], capture_output=True, text=True, check=True, timeout=5)
+        matches = []
+        for line in listing.stdout.splitlines():
+            fields = line.split(":", 2)
+            if len(fields) != 3:
+                continue
+            identifier, kind, profile = fields
+            if kind in ("wifi", "802-11-wireless") and profile.casefold() == name.casefold():
+                matches.append(str(uuid.UUID(identifier)))
+        if len(matches) != 1:
+            raise ValueError("Choose a unique saved Wi-Fi profile by name in Settings.")
+        connection = subprocess.run(["nmcli", "--wait", "15", "connection", "up", "uuid", matches[0]],
+                                    capture_output=True, text=True, timeout=18)
+        if connection.returncode:
+            raise OSError(connection.stderr.strip() or "The saved Wi-Fi network could not connect.")
+        result = {"message": "Connected to saved Wi-Fi profile " + name + "."}
+    elif action != "list":
+        raise ValueError("Unsupported workspace operation.")
+    if action in ("list", "note-save", "project-add", "task-add", "task-add-list", "task-toggle", "task-set", "research-save"):
+        result["workspace"] = snapshot(db)
+    return result
+
+
+def main():
+    action = sys.argv[1]
+    request = json.loads(sys.stdin.buffer.read(1024 * 1024) or b"{}")
+    if action == "voice-download":
+        result = {"voiceFile": download_voice()}
+    elif action == "piper-install":
+        result = install_piper()
+    else:
+        with database() as db:
+            result = command(db, action, request)
+    print(json.dumps(result, ensure_ascii=True))
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (ValueError, KeyError, OSError, sqlite3.Error, subprocess.SubprocessError) as error:
+        print(str(error), file=sys.stderr)
+        sys.exit(1)

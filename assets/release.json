@@ -1,0 +1,14 @@
+{
+  "version": "0.1.0-9",
+  "name": "Workspace",
+  "type": "Feature update",
+  "icon": "sovel-files",
+  "channel": "public",
+  "notes": [
+    "Arrange displays and configure their modes, scaling, rotation, wallpaper, menu bar and dock.",
+    "Sovel Files adds tabs, split view, Recent, Starred, previews, Downloads and persistent background transfers.",
+    "Browse removable drives, mount and safely eject them, and work with ZIP, 7Z, TAR and GZ archives.",
+    "JARED adds local Notes, Projects and Research, scoped file search, task review and previews on a chosen display.",
+    "JARED supports CPU speech with Whisper and Piper and can use local Qwen3.5 4B when the GPU and Ollama are ready."
+  ]
+}

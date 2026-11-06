@@ -1,0 +1,16 @@
+[
+  {
+    "name": "waypaper",
+    "repository": "anufrievroman/waypaper",
+    "tag": "2.9",
+    "url": "https://codeload.github.com/anufrievroman/waypaper/tar.gz/refs/tags/2.9",
+    "sha256": "372c40c82546ec7d57efc0346552d307a5b548de2bac21547da8b148385bfad7"
+  },
+  {
+    "name": "mpvpaper",
+    "repository": "GhostNaN/mpvpaper",
+    "tag": "1.9",
+    "url": "https://codeload.github.com/GhostNaN/mpvpaper/tar.gz/refs/tags/1.9",
+    "sha256": "6de941b54941cfd5d00bac62d10ef47c1338f237dac4c78a7185d0f8d30cd4d1"
+  }
+]

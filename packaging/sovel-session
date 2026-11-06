@@ -1,0 +1,54 @@
+#!/bin/sh
+set -eu
+# Machine setting is a single value, never sourced as shell code.
+rendering=auto
+if test -r /etc/sovel/rendering; then
+  rendering=$(cat /etc/sovel/rendering)
+fi
+# The live boot menu can request the software fallback without changing the image.
+if test -r /proc/cmdline; then
+  for option in $(cat /proc/cmdline); do
+    case "$option" in sovel.renderer=*) rendering=${option#sovel.renderer=} ;; esac
+  done
+fi
+case "$rendering" in
+  auto) ;;
+  software) export WLR_RENDERER=pixman QT_QUICK_BACKEND=software ;;
+  software-gl) export WLR_RENDERER=pixman QT_QUICK_BACKEND=rhi LIBGL_ALWAYS_SOFTWARE=1 QSG_RHI_BACKEND=opengl ;;
+  *) echo 'Sovel: invalid /etc/sovel/rendering (expected auto, software or software-gl)' >&2; exit 2 ;;
+esac
+# Explicit recovery mode for machines without a working EGL renderer.
+case "${1:-}" in
+  --software)
+    export WLR_RENDERER=pixman
+    export QT_QUICK_BACKEND=software
+    shift
+    ;;
+  "") ;;
+  *) echo 'Usage: sovel-session [--software]' >&2; exit 2 ;;
+esac
+test "$#" -eq 0 || { echo 'Usage: sovel-session [--software]' >&2; exit 2; }
+export XDG_SESSION_TYPE=wayland
+export XDG_CURRENT_DESKTOP=Sovel
+export XDG_SESSION_DESKTOP=sovel
+export QT_QPA_PLATFORM=wayland
+export QT_QUICK_CONTROLS_STYLE=Basic
+# Preserve a previously selected input method; set a fresh session's defaults.
+: "${QT_IM_MODULE:=fcitx}" "${GTK_IM_MODULE:=fcitx}" "${XMODIFIERS:=@im=fcitx}"
+export QT_IM_MODULE GTK_IM_MODULE XMODIFIERS
+unset QT_WAYLAND_SHELL_INTEGRATION
+command -v labwc >/dev/null || { echo 'Sovel: compositor unavailable' >&2; exit 1; }
+# greetd/PAM owns the user's runtime directory. Do not fabricate one.
+test -n "${XDG_RUNTIME_DIR:-}" || { echo 'Sovel: no login runtime directory' >&2; exit 1; }
+# Generate this user's compositor preferences before starting the session. The
+# helper validates a fixed schema and never sources user files as shell code.
+session_config=/usr/share/sovel/labwc
+if printf '{}' | /usr/libexec/sovel-settings-helper apply-preferences >/dev/null; then
+  candidate="${XDG_CONFIG_HOME:-$HOME/.config}/Sovel/labwc"
+  if test -r "$candidate/rc.xml"; then session_config=$candidate; fi
+fi
+if test -n "${DBUS_SESSION_BUS_ADDRESS:-}"; then
+  exec labwc -C "$session_config"
+else
+  exec dbus-run-session -- labwc -C "$session_config"
+fi

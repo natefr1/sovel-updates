@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+<defs>
+ <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#060a18"/><stop offset=".46" stop-color="#241643"/><stop offset=".74" stop-color="#751e86"/><stop offset="1" stop-color="#090713"/></linearGradient>
+ <radialGradient id="halo" cx="50%" cy="50%" r="50%"><stop stop-color="#9d41fc" stop-opacity=".4"/><stop offset="1" stop-color="#4928c2" stop-opacity="0"/></radialGradient>
+ <linearGradient id="planet" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0b091d"/><stop offset=".55" stop-color="#271148"/><stop offset=".9" stop-color="#6f32af"/><stop offset="1" stop-color="#e3a0ff"/></linearGradient>
+ <linearGradient id="lake" x2="0" y2="1"><stop stop-color="#4c125e"/><stop offset=".3" stop-color="#150a25"/><stop offset="1" stop-color="#040607"/></linearGradient>
+ <linearGradient id="lava"><stop stop-color="#5e26c9" stop-opacity="0"/><stop offset=".5" stop-color="#ee42ba"/><stop offset="1" stop-color="#9c21cd" stop-opacity="0"/></linearGradient>
+</defs>
+<path fill="url(#sky)" d="M0 0h1600v1000H0z"/>
+<ellipse cx="1040" cy="240" rx="620" ry="500" fill="url(#halo)"/>
+<circle cx="1280" cy="140" r="218" fill="url(#planet)" stroke="#bb87f9" stroke-opacity=".6" stroke-width="2"/>
+<g fill="#d8c4ed" opacity=".5"><circle cx="140" cy="110" r="1"/><circle cx="620" cy="98" r="1.2"/><circle cx="810" cy="210" r="1"/><circle cx="450" cy="180" r="1"/><circle cx="950" cy="62" r="1"/><circle cx="330" cy="300" r="1.2"/><circle cx="1560" cy="260" r="1"/><circle cx="740" cy="320" r="1"/><circle cx="380" cy="55" r="1"/></g>
+<path d="M0 655 110 505 210 550 350 345 450 485 510 435 650 622 800 458 940 590 1110 388 1250 550 1320 480 1450 624 1600 390V1000H0Z" fill="#17132b"/>
+<path d="m210 550 140-205 100 140-87-62-36 65-24-25-53 77zM940 590l170-202 140 162-114-95-21 27-20-44-85 111z" fill="#6b5386" opacity=".6"/>
+<path d="M0 770 125 655 300 735 440 545 590 760 720 672 860 786 1040 590 1180 732 1320 612 1490 740 1600 680V1000H0Z" fill="#080a15"/>
+<path d="m350 735 90-190-33 151 68 34-33 39 115 22-49 51" fill="none" stroke="#c936c9" stroke-opacity=".6" stroke-width="4"/>
+<path d="M0 820Q400 760 800 805t800-5V1000H0Z" fill="url(#lake)"/>
+<path d="M0 854q390-30 740 0t860-10M50 895q460-20 800 0t700-5M0 943q300-20 700 0t900-5" fill="none" stroke="url(#lava)" stroke-width="4" opacity=".75"/>
+<path d="M0 1000V910l100-40 120 45 90-15 100 100zm760 0 100-68 90 18 75-54 105 33 80 71zM1300 1000l120-110 100 24 80-37v123z" fill="#040607"/>
+</svg>

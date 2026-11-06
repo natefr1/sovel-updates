@@ -1,0 +1,12 @@
+#!/usr/bin/python3
+"""Migrate absent or retired default handlers once, preserving other choices."""
+import os,subprocess
+from pathlib import Path
+state=Path(os.environ.get('XDG_STATE_HOME',str(Path.home()/'.local/state')))/'sovel/default-handlers-v1'
+if state.exists():raise SystemExit(0)
+replaced={'','org.gnome.Software.desktop','org.gnome.Nautilus.desktop','snap-store_snap-store.desktop','io.snapcraft.Store.desktop','sovel-store.desktop'}
+for mime,desktop in [('application/vnd.debian.binary-package','sovel-package-installer.desktop'),('application/x-deb','sovel-package-installer.desktop'),('inode/directory','sovel-files.desktop')]:
+    result=subprocess.run(['xdg-mime','query','default',mime],text=True,capture_output=True,timeout=10)
+    if result.stdout.strip() in replaced:
+        subprocess.run(['xdg-mime','default',desktop,mime],check=True,timeout=10)
+state.parent.mkdir(parents=True,exist_ok=True);state.touch()

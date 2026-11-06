@@ -1,0 +1,11 @@
+#!/usr/bin/python3
+"""Initialize integration defaults, then launch the external Waypaper app."""
+import configparser,os,sys
+from pathlib import Path
+config=Path(os.environ.get('XDG_CONFIG_HOME',str(Path.home()/'.config')))/'waypaper/config.ini'
+if not config.exists():
+    config.parent.mkdir(parents=True,exist_ok=True)
+    defaults=configparser.ConfigParser()
+    defaults['Settings']={'backend':'mpvpaper','folder':str(Path.home()/'Pictures')+'\n'+str(Path.home()/'Downloads'),'stylesheet':'/usr/share/sovel/waypaper.css','mpvpaper_sound':'False','mpvpaper_options':'','wallpaper':''}
+    with config.open('w') as stream:defaults.write(stream)
+os.execvp('waypaper',['waypaper','--backend','mpvpaper',*sys.argv[1:]])

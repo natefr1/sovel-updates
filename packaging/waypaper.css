@@ -1,0 +1,6 @@
+window { background-color: #1b1423; color: #eee5f7; }
+button, entry, combobox { border-radius: 10px; padding: 7px; }
+button { background: #352440; color: #f4e8ff; border-color: #664678; }
+button:hover { background: #664386; }
+entry { background: #24172f; color: #f4e8ff; }
+flowboxchild:selected { background: #78529b; border-radius: 12px; }

@@ -1,0 +1,8 @@
+#!/usr/bin/python3
+"""A single fixed, signed-repository native install. Never remove packages."""
+import os,subprocess,sys
+if os.geteuid()!=0 or sys.argv[1:]!=['kdeconnect']:raise SystemExit('Unsupported Store operation.')
+env={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','DEBIAN_FRONTEND':'noninteractive','LC_ALL':'C'}
+plan=subprocess.run(['/usr/bin/apt-get','-s','--no-install-recommends','--no-remove','install','kdeconnect'],env=env,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+if plan.returncode or any(line.startswith('Remv ') for line in plan.stdout.splitlines()):raise SystemExit('The native install would remove packages; blocked.')
+raise SystemExit(subprocess.call(['/usr/bin/apt-get','-o','DPkg::Lock::Timeout=120','--no-install-recommends','--no-remove','-y','install','kdeconnect'],env=env))

@@ -1,0 +1,143 @@
+#!/usr/bin/python3
+"""Account-owned background Store jobs. No removal operation exists."""
+import argparse,fcntl,hashlib,json,os,re,signal,subprocess,sys,threading,time,uuid
+from pathlib import Path
+from urllib.request import urlopen,Request
+
+ROOT=Path(os.environ.get('XDG_STATE_HOME',str(Path.home()/'.local/state')))/'Sovel/store'
+ID=re.compile(r'^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+){2,}$')
+JOB=re.compile(r'^[a-f0-9]{32}$')
+def initialize():
+ ROOT.mkdir(parents=True,exist_ok=True,mode=0o700);os.chmod(ROOT,0o700)
+def write(path,value):
+ data=json.dumps(value,ensure_ascii=False).encode();tmp=path.with_suffix('.tmp')
+ fd=os.open(tmp,os.O_WRONLY|os.O_CREAT|os.O_TRUNC|os.O_NOFOLLOW,0o600)
+ with os.fdopen(fd,'wb') as stream:stream.write(data)
+ os.replace(tmp,path)
+def catalog():
+ for path in [Path('/usr/share/sovel/store-catalog.json'),Path(__file__).resolve().parent.parent/'assets/store-catalog.json']:
+  if path.is_file():return {a['id']:a for a in json.loads(path.read_text(encoding='utf-8'))}
+ raise RuntimeError('The trusted Store catalog is unavailable.')
+def permitted_operations(operations):
+ return all(str(op.get_operation_type().value_nick) in ('install','update','install-bundle') for op in operations)
+def execute(job):
+ import gi
+ gi.require_version('Flatpak','1.0')
+ from gi.repository import Flatpak,Gio,GLib
+ initialize();path=ROOT/(job+'.json');record=json.loads(path.read_text());id=record['app'];assert ID.fullmatch(id)
+ lock=open(ROOT/'transaction.lock','a')
+ while True:
+  if (ROOT/(job+'.cancel')).exists():record.update(state='cancelled',status='Cancelled before starting.',progress=-1);write(path,record);return
+  try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB);break
+  except BlockingIOError:time.sleep(.2)
+ cancelled=threading.Event();done=threading.Event();cancellable=Gio.Cancellable()
+ def update(**changes):
+  record.update(changes);record['updatedAt']=int(time.time());write(path,record)
+ def monitor():
+  began=time.monotonic()
+  while not done.wait(.2):
+   if (ROOT/(job+'.cancel')).exists():cancelled.set();cancellable.cancel();return
+   if time.monotonic()-began>1800:cancellable.cancel();return
+ threading.Thread(target=monitor,daemon=True).start()
+ signal.signal(signal.SIGTERM,lambda *_:(cancelled.set(),cancellable.cancel()))
+ try:
+  update(state='running',status='Preparing installation…',progress=-1,pid=os.getpid())
+  if (ROOT/(job+'.cancel')).exists():raise RuntimeError('Cancelled before starting.')
+  app=catalog().get(id,{});source=app.get('sourceKind','flatpak');operation=record['operation']
+  if source=='flatpak':
+   installation=Flatpak.Installation.new_system(cancellable) if record.get('scope')=='system' else Flatpak.Installation.new_user(cancellable)
+   remote=installation.get_remote_by_name('flathub',cancellable)
+   if remote.get_url().rstrip('/') not in ('https://dl.flathub.org/repo','https://flathub.org/repo') or not remote.get_gpg_verify():raise RuntimeError('The Flathub source does not match the trusted, signed repository. Review the app source before installing.')
+   tx=Flatpak.Transaction.new_for_installation(installation,cancellable);tx.set_no_interaction(True)
+   def ready(transaction):
+    allowed=permitted_operations(transaction.get_operations())
+    if not allowed:update(status='Blocked: this operation would remove an app or runtime.')
+    return allowed
+   tx.connect('ready',ready)
+   tx.connect('add-new-remote',lambda *_:False)
+   def new_operation(transaction,op,progress):
+    if not permitted_operations([op]):cancellable.cancel();update(status='Blocked: app removal is never allowed by Store.');return
+    progress.set_update_frequency(250)
+    def changed(p):update(status=p.get_status(),progress=-1 if p.get_is_estimating() else p.get_progress(),bytes=p.get_bytes_transferred(),ref=op.get_ref())
+    progress.connect('changed',changed);changed(progress)
+   tx.connect('new-operation',new_operation)
+   refs=[ref for ref in installation.list_installed_refs(cancellable) if ref.get_kind()==Flatpak.RefKind.APP and ref.get_name()==id]
+   if operation=='install' and not refs:tx.add_install('flathub','app/'+id+'/'+Flatpak.get_default_arch()+'/stable',None)
+   elif operation in ('install','update'):
+    if not refs:raise RuntimeError('This app is no longer installed in the selected location.')
+    for ref in refs:tx.add_update(ref.format_ref(),None,None)
+   else:raise ValueError('Unsupported Store operation.')
+   tx.run(cancellable)
+  elif source=='apt':
+   if id!='org.kde.kdeconnect' or operation not in ('install','update'):raise ValueError('Unsupported native app.')
+   update(status='Approve the native app installation when prompted.')
+   child=subprocess.Popen(['pkexec','/usr/libexec/sovel-store-admin','kdeconnect'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
+   for line in child.stdout:update(status=line.strip()[-240:])
+   if child.wait()!=0:raise RuntimeError('Native installation was cancelled or failed. Review authorization and retry.')
+  elif source=='appimage':
+   if id!='com.storytold.ArtCraft' or operation not in ('install','update'):raise ValueError('Unsupported standalone app operation.')
+   download=app['download'];url=download['url']
+   if not url.startswith('https://github.com/storytold/craft-launcher/releases/download/'):raise ValueError('Untrusted app source.')
+   directory=Path(os.environ.get('XDG_DATA_HOME',str(Path.home()/'.local/share')))/'Sovel/apps'/id
+   directory.mkdir(parents=True,exist_ok=True,mode=0o700);target=directory/'ArtCraft.AppImage';temporary=directory/'ArtCraft.download'
+   digest=hashlib.sha256();size=0
+   with urlopen(Request(url,headers={'User-Agent':'Sovel-Store/0.1.0-8'}),timeout=45) as response,open(temporary,'wb') as stream:
+    while True:
+     if cancelled.is_set():raise RuntimeError('Download cancelled.')
+     block=response.read(262144)
+     if not block:break
+     size+=len(block)
+     if size>download['bytes']:raise RuntimeError('Download size did not match the verified release.')
+     stream.write(block);digest.update(block);update(status='Downloading the verified ArtCraft release…',progress=int(size*100/download['bytes']),bytes=size)
+   if size!=download['bytes'] or digest.hexdigest()!=download['sha256']:raise RuntimeError('The downloaded app did not pass verification.')
+   os.chmod(temporary,0o700);os.replace(temporary,target)
+   write(directory/'release.json',{'version':app['version'],'sha256':download['sha256'],'installedAt':int(time.time())})
+   desktops=Path(os.environ.get('XDG_DATA_HOME',str(Path.home()/'.local/share')))/'applications';desktops.mkdir(parents=True,exist_ok=True)
+   escaped=str(target).replace('\\','\\\\').replace('"','\\"').replace('`','\\`').replace('$','\\$').replace('%','%%')
+   desktop=desktops/(id+'.desktop');desktop.write_text('[Desktop Entry]\nType=Application\nName=ArtCraft\nComment=Official ArtCraft launcher\nExec="'+escaped+'" --appimage-extract-and-run\nIcon=applications-graphics\nCategories=Graphics;\nTerminal=false\n',encoding='utf-8');os.chmod(desktop,0o600)
+  else:raise ValueError('Unsupported app source.')
+  update(state='complete',status='Installation complete. The app is ready to open.',progress=100)
+ except Exception as exc:update(state='cancelled' if cancelled.is_set() else 'failed',status=str(exc)[:1000],progress=-1)
+ finally:done.set()
+
+def main():
+ parser=argparse.ArgumentParser();parser.add_argument('command',choices=['start','status','updates','cancel','run']);parser.add_argument('values',nargs='*');args=parser.parse_args();initialize()
+ if args.command=='updates':
+  import gi
+  gi.require_version('Flatpak','1.0')
+  from gi.repository import Flatpak
+  updates=[];errors=[]
+  for scope,installation in [('user',Flatpak.Installation.new_user(None)),('system',Flatpak.Installation.new_system(None))]:
+   apps=installation.list_installed_refs_by_kind(Flatpak.RefKind.APP,None)
+   if not apps:continue
+   try:
+    origins={ref.get_origin():ref for ref in apps}
+    for origin,ref in origins.items():installation.fetch_remote_ref_sync(origin,Flatpak.RefKind.APP,ref.get_name(),ref.get_arch(),ref.get_branch(),None)
+    for ref in installation.list_installed_refs_for_update(None):
+     if ref.get_kind()==Flatpak.RefKind.APP:updates.append({'id':ref.get_name(),'scope':scope})
+   except Exception as error:errors.append(str(error)[:500])
+  directory=Path(os.environ.get('XDG_DATA_HOME',str(Path.home()/'.local/share')))/'Sovel/apps/com.storytold.ArtCraft'
+  try:
+   installed=json.loads((directory/'release.json').read_text());app=catalog()['com.storytold.ArtCraft']
+   if installed.get('version')!=app['version']:updates.append({'id':app['id'],'scope':'user'})
+  except (OSError,ValueError,KeyError):pass
+  print(json.dumps({'updates':updates,'errors':errors}));return
+ if args.command=='run':
+  assert len(args.values)==1 and JOB.fullmatch(args.values[0]);execute(args.values[0]);return
+ if args.command=='start':
+  assert len(args.values) in (2,3);operation,id=args.values[:2];scope=args.values[2] if len(args.values)==3 else 'user'
+  assert operation in ('install','update') and ID.fullmatch(id) and scope in ('user','system')
+  job=uuid.uuid4().hex;write(ROOT/(job+'.json'),{'job':job,'app':id,'operation':operation,'scope':scope,'state':'queued','status':'Queued','progress':-1,'createdAt':int(time.time())})
+  log=open(ROOT/(job+'.log'),'ab');os.chmod(ROOT/(job+'.log'),0o600)
+  subprocess.Popen([sys.executable,str(Path(__file__).resolve()),'run',job],stdin=subprocess.DEVNULL,stdout=log,stderr=log,start_new_session=True,close_fds=True)
+  print(json.dumps({'job':job}));return
+ if args.command=='cancel':
+  assert len(args.values)==1 and JOB.fullmatch(args.values[0]);path=ROOT/(args.values[0]+'.json');record=json.loads(path.read_text())
+  if record['state'] in ('queued','running') and catalog().get(record['app'],{}).get('sourceKind','flatpak')!='apt':(ROOT/(args.values[0]+'.cancel')).touch(mode=0o600)
+  print('{}');return
+ jobs=[]
+ for path in sorted(ROOT.glob('*.json'),key=lambda p:p.stat().st_mtime,reverse=True)[:100]:
+  try:jobs.append(json.loads(path.read_text(encoding='utf-8')))
+  except (ValueError,OSError):pass
+ print(json.dumps({'jobs':jobs}))
+if __name__=='__main__':main()

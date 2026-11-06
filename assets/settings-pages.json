@@ -1,0 +1,2195 @@
+{
+  "version": 1,
+  "pages": [
+    {
+      "id": "home",
+      "name": "Home",
+      "group": "Overview",
+      "icon": "home",
+      "description": "Your computer, at a glance.",
+      "sections": [
+        {
+          "title": "Quick access",
+          "items": [
+            {
+              "type": "link",
+              "label": "Network & Internet",
+              "target": "network",
+              "detail": ""
+            },
+            {
+              "type": "link",
+              "label": "Sound",
+              "target": "sound",
+              "detail": ""
+            },
+            {
+              "type": "link",
+              "label": "Bluetooth & Devices",
+              "target": "devices",
+              "detail": ""
+            },
+            {
+              "type": "link",
+              "label": "SOVEL Update",
+              "target": "updates",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "title": "Your workspace",
+          "items": [
+            {
+              "type": "link",
+              "label": "Appearance",
+              "target": "appearance",
+              "detail": ""
+            },
+            {
+              "type": "link",
+              "label": "Desktop & Dock",
+              "target": "desktop",
+              "detail": ""
+            },
+            {
+              "type": "link",
+              "label": "Widgets & Search",
+              "target": "widgets",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "legacy": -1
+    },
+    {
+      "id": "appearance",
+      "name": "Appearance",
+      "group": "Personalization",
+      "icon": "appearance",
+      "description": "Make Sovel feel like your space.",
+      "sections": [
+        {
+          "title": "Color & materials",
+          "items": [
+            {
+              "type": "preference",
+              "key": "appearance.mode"
+            },
+            {
+              "type": "preference",
+              "key": "appearance.accent"
+            },
+            {
+              "type": "preference",
+              "key": "appearance.density"
+            },
+            {
+              "type": "preference",
+              "key": "reduceTransparency"
+            }
+          ]
+        },
+        {
+          "title": "Typography",
+          "items": [
+            {
+              "type": "preference",
+              "key": "appearance.font"
+            },
+            {
+              "type": "preference",
+              "key": "appearance.textSize"
+            }
+          ]
+        },
+        {
+          "title": "Motion",
+          "items": [
+            {
+              "type": "preference",
+              "key": "reduceMotion"
+            },
+            {
+              "type": "preference",
+              "key": "shell.animationSpeed"
+            }
+          ]
+        },
+        {
+          "title": "Appearance profiles",
+          "items": [
+            {
+              "type": "action",
+              "label": "Export appearance profile",
+              "operation": "export-profile",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "action",
+              "label": "Import and review a profile",
+              "operation": "import-profile",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "action",
+              "label": "Reset appearance",
+              "operation": "reset-appearance",
+              "detail": "",
+              "capability": ""
+            }
+          ]
+        }
+      ],
+      "legacy": 1
+    },
+    {
+      "id": "wallpaper",
+      "name": "Wallpaper & Lock Screen",
+      "group": "Personalization",
+      "icon": "wallpaper",
+      "description": "Backgrounds, secure locking and sign-in preferences.",
+      "sections": [
+        {
+          "title": "Background",
+          "items": [
+            {
+              "type": "link",
+              "label": "Choose a downloaded image",
+              "target": "wallpaper-image",
+              "detail": ""
+            },
+            {
+              "type": "action",
+              "label": "Open wallpaper collection",
+              "operation": "wallpaper-picker",
+              "detail": "",
+              "capability": ""
+            }
+          ]
+        },
+        {
+          "title": "Lock screen",
+          "items": [
+            {
+              "type": "action",
+              "label": "Lock now",
+              "operation": "lock",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "link",
+              "label": "Lock screen appearance",
+              "target": "lockscreen",
+              "detail": ""
+            },
+            {
+              "type": "link",
+              "label": "Accessibility",
+              "target": "accessibility",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "title": "Automatic locking",
+          "items": [
+            {
+              "type": "support",
+              "label": "Idle locking",
+              "capability": "idle-lock",
+              "detail": "Automatic locking needs an integrated idle service. The secure Lock Now action remains available."
+            }
+          ]
+        },
+        {
+          "title": "Sign-in",
+          "items": [
+            {
+              "type": "info",
+              "label": "Greeter preserved",
+              "detail": "This update does not replace or reconfigure the login screen."
+            },
+            {
+              "type": "link",
+              "label": "Sign-in and account tools",
+              "target": "users",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "legacy": 2
+    },
+    {
+      "id": "desktop",
+      "name": "Desktop & Dock",
+      "group": "Personalization",
+      "icon": "dock",
+      "description": "A dock that fits the way you work.",
+      "sections": [
+        {
+          "title": "Dock",
+          "items": [
+            {
+              "type": "preference",
+              "key": "shell.autoHide"
+            },
+            {
+              "type": "preference",
+              "key": "shell.activationEdge"
+            },
+            {
+              "type": "preference",
+              "key": "shell.sensitivity"
+            },
+            {
+              "type": "preference",
+              "key": "shell.revealDelay"
+            },
+            {
+              "type": "preference",
+              "key": "shell.hideDelay"
+            }
+          ]
+        },
+        {
+          "title": "Windows & workspaces",
+          "items": [
+            {
+              "type": "preference",
+              "key": "desktop.workspaces"
+            },
+            {
+              "type": "preference",
+              "key": "desktop.snap"
+            },
+            {
+              "type": "info",
+              "label": "Pin and arrange apps",
+              "detail": "Right-click an app in App Library to pin it. Drag pinned icons to reorder them. App Library stays last."
+            }
+          ]
+        },
+        {
+          "title": "Related settings",
+          "items": [
+            {
+              "type": "link",
+              "label": "Menu Bar & Control Center",
+              "target": "menubar",
+              "detail": ""
+            },
+            {
+              "type": "link",
+              "label": "Widgets & Search",
+              "target": "widgets",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "legacy": 11
+    },
+    {
+      "id": "menubar",
+      "name": "Menu Bar & Control Center",
+      "group": "Personalization",
+      "icon": "menubar",
+      "description": "Choose what belongs in your menu bar.",
+      "sections": [
+        {
+          "title": "Visibility",
+          "items": [
+            {
+              "type": "preference",
+              "key": "bar.visible"
+            },
+            {
+              "type": "preference",
+              "key": "bar.autoHide"
+            },
+            {
+              "type": "preference",
+              "key": "bar.opacity"
+            },
+            {
+              "type": "preference",
+              "key": "bar.show.search"
+            },
+            {
+              "type": "preference",
+              "key": "bar.show.control"
+            }
+          ]
+        },
+        {
+          "title": "Status icons",
+          "items": [
+            {
+              "type": "preference",
+              "key": "bar.show.network"
+            },
+            {
+              "type": "preference",
+              "key": "bar.show.bluetooth"
+            },
+            {
+              "type": "preference",
+              "key": "bar.show.sound"
+            },
+            {
+              "type": "preference",
+              "key": "bar.show.battery"
+            },
+            {
+              "type": "preference",
+              "key": "bar.show.notifications"
+            },
+            {
+              "type": "preference",
+              "key": "bar.show.updates"
+            },
+            {
+              "type": "preference",
+              "key": "bar.show.downloads"
+            },
+            {
+              "type": "preference",
+              "key": "bar.show.jared"
+            },
+            {
+              "type": "preference",
+              "key": "bar.show.calendar"
+            }
+          ]
+        },
+        {
+          "title": "Clock",
+          "items": [
+            {
+              "type": "preference",
+              "key": "clock.format"
+            },
+            {
+              "type": "preference",
+              "key": "clock.seconds"
+            },
+            {
+              "type": "preference",
+              "key": "clock.weekday"
+            }
+          ]
+        },
+        {
+          "title": "Activation & arrangement",
+          "items": [
+            {
+              "type": "link",
+              "label": "Reveal sensitivity and delays",
+              "target": "desktop",
+              "detail": ""
+            },
+            {
+              "type": "action",
+              "label": "Arrange status icons",
+              "operation": "arrange-bar",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "link",
+              "label": "Notification preferences",
+              "target": "notifications",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "legacy": -1
+    },
+    {
+      "id": "widgets",
+      "name": "Widgets & Search",
+      "group": "Personalization",
+      "icon": "widgets",
+      "description": "A useful desktop, with your data under your control.",
+      "sections": [
+        {
+          "title": "Desktop widgets",
+          "items": [
+            {
+              "type": "preference",
+              "key": "widgets.visible"
+            },
+            {
+              "type": "preference",
+              "key": "widgets.animations"
+            },
+            {
+              "type": "preference",
+              "key": "widgets.snapToGrid"
+            },
+            {
+              "type": "preference",
+              "key": "widgets.opacity"
+            },
+            {
+              "type": "action",
+              "label": "Add and arrange widgets",
+              "operation": "widget-editor",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "preference",
+              "key": "widgets.private"
+            }
+          ]
+        },
+        {
+          "title": "Weather privacy",
+          "items": [
+            {
+              "type": "preference",
+              "key": "weather.enabled"
+            },
+            {
+              "type": "info",
+              "label": "Location stays your choice",
+              "detail": "Weather uses a city you choose. It does not request your automatic location."
+            },
+            {
+              "type": "action",
+              "label": "Choose weather city",
+              "operation": "weather-city",
+              "detail": "",
+              "capability": ""
+            }
+          ]
+        },
+        {
+          "title": "Search",
+          "items": [
+            {
+              "type": "preference",
+              "key": "search.recommendations"
+            },
+            {
+              "type": "info",
+              "label": "Local search",
+              "detail": "Settings search and App Library search work locally. No web search or file-content indexing is silently enabled."
+            }
+          ]
+        }
+      ],
+      "legacy": -1
+    },
+    {
+      "id": "displays",
+      "name": "Displays & Graphics",
+      "group": "Hardware",
+      "icon": "display",
+      "description": "Connected screens and the graphics hardware driving them.",
+      "sections": [
+        {
+          "title": "Display configuration",
+          "items": [
+            {
+              "type": "action",
+              "label": "Identify displays",
+              "operation": "identify-displays",
+              "detail": "",
+              "capability": "display"
+            },
+            {
+              "type": "action",
+              "label": "Configure displays",
+              "operation": "display-config",
+              "detail": "",
+              "capability": "display-tool"
+            }
+          ]
+        },
+        {
+          "title": "Graphics support",
+          "items": [
+            {
+              "type": "support",
+              "label": "HDR and variable refresh",
+              "capability": "hdr",
+              "detail": "These controls require an exposed, supported compositor and display interface."
+            },
+            {
+              "type": "support",
+              "label": "Night light",
+              "capability": "night-light",
+              "detail": "Color-temperature controls require an integrated color service."
+            }
+          ]
+        },
+        {
+          "title": "Related settings",
+          "items": [
+            {
+              "type": "link",
+              "label": "Text size and contrast",
+              "target": "accessibility",
+              "detail": ""
+            },
+            {
+              "type": "link",
+              "label": "Gaming & Performance",
+              "target": "gaming",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "legacy": -1
+    },
+    {
+      "id": "sound",
+      "name": "Sound",
+      "group": "Hardware",
+      "icon": "sound",
+      "description": "Outputs, microphones, app routing and audio tests.",
+      "sections": [
+        {
+          "title": "Sound & Audio",
+          "items": [
+            {
+              "type": "info",
+              "label": "Live controls",
+              "detail": "Output, Input, Applications and Advanced share one audio service."
+            }
+          ]
+        }
+      ],
+      "legacy": 7
+    },
+    {
+      "id": "devices",
+      "name": "Bluetooth & Devices",
+      "group": "Hardware",
+      "icon": "bluetooth",
+      "description": "Your paired devices and connected hardware.",
+      "sections": [
+        {
+          "title": "Bluetooth",
+          "items": [
+            {
+              "type": "info",
+              "label": "Friendly names",
+              "detail": "Paired devices can be renamed. Battery levels appear when the device reports them."
+            }
+          ]
+        },
+        {
+          "title": "Hardware",
+          "items": [
+            {
+              "type": "action",
+              "label": "Refresh connected devices",
+              "operation": "refresh",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "support",
+              "label": "Cameras and controllers",
+              "capability": "device-tools",
+              "detail": "Device-specific controls appear when a supported tool is installed."
+            }
+          ]
+        }
+      ],
+      "legacy": 10
+    },
+    {
+      "id": "input",
+      "name": "Keyboard & Input",
+      "group": "Hardware",
+      "icon": "keyboard",
+      "description": "Comfortable typing, pointing and multilingual input.",
+      "sections": [
+        {
+          "title": "Keyboard",
+          "items": [
+            {
+              "type": "preference",
+              "key": "input.repeatRate"
+            },
+            {
+              "type": "preference",
+              "key": "input.repeatDelay"
+            },
+            {
+              "type": "action",
+              "label": "Input methods and layouts",
+              "operation": "input-config",
+              "detail": "",
+              "capability": "input-methods"
+            }
+          ]
+        },
+        {
+          "title": "Mouse",
+          "items": [
+            {
+              "type": "preference",
+              "key": "input.pointerSpeed"
+            },
+            {
+              "type": "preference",
+              "key": "input.naturalScroll"
+            },
+            {
+              "type": "preference",
+              "key": "input.leftHanded"
+            },
+            {
+              "type": "preference",
+              "key": "input.acceleration"
+            }
+          ]
+        },
+        {
+          "title": "Touchpad",
+          "items": [
+            {
+              "type": "preference",
+              "key": "input.tapToClick"
+            },
+            {
+              "type": "preference",
+              "key": "input.disableWhileTyping"
+            }
+          ]
+        },
+        {
+          "title": "Shortcuts",
+          "items": [
+            {
+              "type": "info",
+              "label": "Sovel shortcuts",
+              "detail": "Super+Shift+S: region screenshot. Super+J: JARED. Super+I: Settings. Super+E: Files. Super+L: lock."
+            },
+            {
+              "type": "link",
+              "label": "Language & Region",
+              "target": "language",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "legacy": -1
+    },
+    {
+      "id": "printers",
+      "name": "Printers & Scanners",
+      "group": "Hardware",
+      "icon": "printer",
+      "description": "Printing and scanning through installed device services.",
+      "sections": [
+        {
+          "title": "Printers",
+          "items": [
+            {
+              "type": "action",
+              "label": "Manage printers and queues",
+              "operation": "printers",
+              "detail": "",
+              "capability": "printers"
+            }
+          ]
+        },
+        {
+          "title": "Scanners",
+          "items": [
+            {
+              "type": "action",
+              "label": "Open document scanner",
+              "operation": "scanner",
+              "detail": "",
+              "capability": "scanner"
+            }
+          ]
+        },
+        {
+          "title": "Support",
+          "items": [
+            {
+              "type": "info",
+              "label": "Device availability",
+              "detail": "Only devices and capabilities reported by the installed printing/scanning services are shown."
+            }
+          ]
+        }
+      ],
+      "legacy": -1
+    },
+    {
+      "id": "network",
+      "name": "Network & Internet",
+      "group": "Connectivity",
+      "icon": "network",
+      "description": "Connect, discover networks and manage connection profiles.",
+      "sections": [
+        {
+          "title": "Connections",
+          "items": [
+            {
+              "type": "action",
+              "label": "Advanced connection settings",
+              "operation": "network-config",
+              "detail": "",
+              "capability": "network-tool"
+            }
+          ]
+        },
+        {
+          "title": "Privacy & security",
+          "items": [
+            {
+              "type": "link",
+              "label": "Firewall and application permissions",
+              "target": "privacy",
+              "detail": ""
+            },
+            {
+              "type": "link",
+              "label": "Sharing & Remote Access",
+              "target": "sharing",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "legacy": 8
+    },
+    {
+      "id": "sharing",
+      "name": "Sharing & Remote Access",
+      "group": "Connectivity",
+      "icon": "sharing",
+      "description": "Make remote access an explicit choice.",
+      "sections": [
+        {
+          "title": "Remote login",
+          "items": [
+            {
+              "type": "action",
+              "label": "Review SSH configuration",
+              "operation": "ssh-review",
+              "detail": "",
+              "capability": "ssh"
+            },
+            {
+              "type": "support",
+              "label": "Remote desktop",
+              "capability": "remote-desktop",
+              "detail": "Remote desktop requires an installed, configured server with authenticated access."
+            }
+          ]
+        },
+        {
+          "title": "Nearby devices",
+          "items": [
+            {
+              "type": "action",
+              "label": "Open LocalSend",
+              "operation": "localsend",
+              "detail": "",
+              "capability": "localsend"
+            },
+            {
+              "type": "action",
+              "label": "Open KDE Connect",
+              "operation": "kdeconnect",
+              "detail": "",
+              "capability": "kdeconnect"
+            }
+          ]
+        },
+        {
+          "title": "Network sharing",
+          "items": [
+            {
+              "type": "action",
+              "label": "Connection sharing and hotspot settings",
+              "operation": "network-config",
+              "detail": "",
+              "capability": "network-tool"
+            }
+          ]
+        }
+      ],
+      "legacy": -1
+    },
+    {
+      "id": "notifications",
+      "name": "Notifications & Focus",
+      "group": "System",
+      "icon": "notifications",
+      "description": "Quiet when you need it; visible when it matters.",
+      "sections": [
+        {
+          "title": "Focus",
+          "items": [
+            {
+              "type": "preference",
+              "key": "notifications.focus"
+            },
+            {
+              "type": "preference",
+              "key": "notifications.duration"
+            },
+            {
+              "type": "preference",
+              "key": "notifications.history"
+            }
+          ]
+        },
+        {
+          "title": "Notification center",
+          "items": [
+            {
+              "type": "action",
+              "label": "View notification history",
+              "operation": "notification-history",
+              "detail": "",
+              "capability": "notifications"
+            },
+            {
+              "type": "action",
+              "label": "Clear notification history",
+              "operation": "clear-notifications",
+              "detail": "",
+              "capability": "notifications"
+            }
+          ]
+        },
+        {
+          "title": "Related settings",
+          "items": [
+            {
+              "type": "link",
+              "label": "Menu bar indicators",
+              "target": "menubar",
+              "detail": ""
+            },
+            {
+              "type": "link",
+              "label": "Personal usage and break reminders",
+              "target": "screentime",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "legacy": -1
+    },
+    {
+      "id": "apps",
+      "name": "Apps & Defaults",
+      "group": "System",
+      "icon": "apps",
+      "description": "Installed apps, default handlers and startup preferences.",
+      "sections": [
+        {
+          "title": "Applications",
+          "items": [
+            {
+              "type": "action",
+              "label": "Open App Library",
+              "operation": "library",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "action",
+              "label": "Open Store",
+              "operation": "store",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "info",
+              "label": "Add-only policy",
+              "detail": "All existing Store listings remain available. Store removal operations remain disabled."
+            }
+          ]
+        },
+        {
+          "title": "Defaults",
+          "items": [
+            {
+              "type": "action",
+              "label": "Choose default applications",
+              "operation": "default-apps",
+              "detail": "",
+              "capability": ""
+            }
+          ]
+        },
+        {
+          "title": "Startup",
+          "items": [
+            {
+              "type": "action",
+              "label": "Review login items",
+              "operation": "startup-items",
+              "detail": "",
+              "capability": ""
+            }
+          ]
+        }
+      ],
+      "legacy": 5
+    },
+    {
+      "id": "power",
+      "name": "Power & Battery",
+      "group": "System",
+      "icon": "power",
+      "description": "Power profiles and hardware-supported energy information.",
+      "sections": [
+        {
+          "title": "Power profiles",
+          "items": [
+            {
+              "type": "info",
+              "label": "Hardware support",
+              "detail": "Profiles are supplied by the installed power service; no performance claim is inferred from a profile name."
+            }
+          ]
+        },
+        {
+          "title": "Battery and sleep",
+          "items": [
+            {
+              "type": "support",
+              "label": "Charging limits",
+              "capability": "charge-limit",
+              "detail": "Charge thresholds are shown only when the device exposes a supported charging interface."
+            },
+            {
+              "type": "support",
+              "label": "Hibernate",
+              "capability": "hibernate",
+              "detail": "Hibernate needs configured swap and resume support."
+            },
+            {
+              "type": "action",
+              "label": "Review sleep inhibitors",
+              "operation": "sleep-inhibitors",
+              "detail": "",
+              "capability": ""
+            }
+          ]
+        }
+      ],
+      "legacy": 9
+    },
+    {
+      "id": "storage",
+      "name": "Storage & Disks",
+      "group": "System",
+      "icon": "storage",
+      "description": "Capacity, volumes and deliberate cleanup.",
+      "sections": [
+        {
+          "title": "Storage",
+          "items": [
+            {
+              "type": "action",
+              "label": "Open Files",
+              "operation": "files",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "action",
+              "label": "Open disk utility",
+              "operation": "disks",
+              "detail": "",
+              "capability": "disks"
+            },
+            {
+              "type": "action",
+              "label": "Analyze disk usage",
+              "operation": "disk-usage",
+              "detail": "",
+              "capability": "disk-usage"
+            }
+          ]
+        },
+        {
+          "title": "Cleanup",
+          "items": [
+            {
+              "type": "info",
+              "label": "Review before deleting",
+              "detail": "No downloads, caches, duplicate files or partitions are deleted automatically."
+            },
+            {
+              "type": "action",
+              "label": "Open Trash",
+              "operation": "trash",
+              "detail": "",
+              "capability": ""
+            }
+          ]
+        },
+        {
+          "title": "Protection",
+          "items": [
+            {
+              "type": "link",
+              "label": "Encryption status",
+              "target": "privacy",
+              "detail": ""
+            },
+            {
+              "type": "link",
+              "label": "Backup & Recovery",
+              "target": "backup",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "legacy": -1
+    },
+    {
+      "id": "users",
+      "name": "Users & Accounts",
+      "group": "System",
+      "icon": "user",
+      "description": "Your local identity and authenticated account changes.",
+      "sections": [
+        {
+          "title": "Current account",
+          "items": [
+            {
+              "type": "action",
+              "label": "Change display name",
+              "operation": "display-name",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "action",
+              "label": "Change account picture",
+              "operation": "account-picture",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "action",
+              "label": "Password and sign-in methods",
+              "operation": "account-security",
+              "detail": "",
+              "capability": "account-tool"
+            }
+          ]
+        },
+        {
+          "title": "Sessions",
+          "items": [
+            {
+              "type": "action",
+              "label": "Review active sessions",
+              "operation": "sessions",
+              "detail": "",
+              "capability": ""
+            }
+          ]
+        },
+        {
+          "title": "Online services",
+          "items": [
+            {
+              "type": "info",
+              "label": "Local account",
+              "detail": "No Sovel cloud account, remote family sync or device-tracking service is simulated."
+            }
+          ]
+        }
+      ],
+      "legacy": -1
+    },
+    {
+      "id": "language",
+      "name": "Language & Region",
+      "group": "System",
+      "icon": "language",
+      "description": "Language, fonts and composition support.",
+      "sections": [
+        {
+          "title": "Language",
+          "items": [
+            {
+              "type": "action",
+              "label": "Choose installed locale",
+              "operation": "choose-locale",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "action",
+              "label": "Input methods and keyboard layouts",
+              "operation": "input-config",
+              "detail": "",
+              "capability": "input-methods"
+            }
+          ]
+        },
+        {
+          "title": "Fonts",
+          "items": [
+            {
+              "type": "action",
+              "label": "Browse installed fonts",
+              "operation": "fonts",
+              "detail": "",
+              "capability": "fonts"
+            },
+            {
+              "type": "info",
+              "label": "Multilingual coverage",
+              "detail": "Noto Sans, CJK and Emoji plus the installed Fcitx5 input engines remain available."
+            }
+          ]
+        },
+        {
+          "title": "Formats",
+          "items": [
+            {
+              "type": "link",
+              "label": "Clock and calendar formats",
+              "target": "datetime",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "legacy": -1
+    },
+    {
+      "id": "datetime",
+      "name": "Date & Time",
+      "group": "System",
+      "icon": "clock",
+      "description": "System time, synchronization and regional formats.",
+      "sections": [
+        {
+          "title": "Clock display",
+          "items": [
+            {
+              "type": "preference",
+              "key": "clock.format"
+            },
+            {
+              "type": "preference",
+              "key": "clock.seconds"
+            },
+            {
+              "type": "preference",
+              "key": "clock.weekday"
+            }
+          ]
+        },
+        {
+          "title": "System clock",
+          "items": [
+            {
+              "type": "action",
+              "label": "Choose time zone",
+              "operation": "timezone",
+              "detail": "",
+              "capability": "timedate"
+            },
+            {
+              "type": "action",
+              "label": "Configure network time",
+              "operation": "network-time",
+              "detail": "",
+              "capability": "timedate"
+            },
+            {
+              "type": "info",
+              "label": "Administrator approval",
+              "detail": "System clock changes use the authenticated system time service."
+            }
+          ]
+        }
+      ],
+      "legacy": -1
+    },
+    {
+      "id": "accessibility",
+      "name": "Accessibility",
+      "group": "Experience",
+      "icon": "accessibility",
+      "description": "Comfortable contrast, motion, text and input.",
+      "sections": [
+        {
+          "title": "Display",
+          "items": [
+            {
+              "type": "preference",
+              "key": "appearance.textSize"
+            },
+            {
+              "type": "preference",
+              "key": "reduceMotion"
+            },
+            {
+              "type": "preference",
+              "key": "reduceTransparency"
+            },
+            {
+              "type": "preference",
+              "key": "accessibility.highContrast"
+            }
+          ]
+        },
+        {
+          "title": "Assistive tools",
+          "items": [
+            {
+              "type": "action",
+              "label": "Screen reader",
+              "operation": "screen-reader",
+              "detail": "",
+              "capability": "screen-reader"
+            },
+            {
+              "type": "action",
+              "label": "On-screen keyboard",
+              "operation": "on-screen-keyboard",
+              "detail": "",
+              "capability": "on-screen-keyboard"
+            }
+          ]
+        },
+        {
+          "title": "Related settings",
+          "items": [
+            {
+              "type": "link",
+              "label": "Keyboard and pointing devices",
+              "target": "input",
+              "detail": ""
+            },
+            {
+              "type": "link",
+              "label": "Audio balance and microphone tests",
+              "target": "sound",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "legacy": 3
+    },
+    {
+      "id": "gaming",
+      "name": "Gaming & Performance",
+      "group": "Experience",
+      "icon": "gaming",
+      "description": "Real performance information and installed game tools.",
+      "sections": [
+        {
+          "title": "Performance",
+          "items": [
+            {
+              "type": "action",
+              "label": "Open system monitor",
+              "operation": "resources",
+              "detail": "",
+              "capability": "resources"
+            },
+            {
+              "type": "link",
+              "label": "Power profiles",
+              "target": "power",
+              "detail": ""
+            },
+            {
+              "type": "link",
+              "label": "Display configuration",
+              "target": "displays",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "title": "Games",
+          "items": [
+            {
+              "type": "action",
+              "label": "Open Steam",
+              "operation": "steam",
+              "detail": "",
+              "capability": "steam"
+            },
+            {
+              "type": "action",
+              "label": "Open Heroic",
+              "operation": "heroic",
+              "detail": "",
+              "capability": "heroic"
+            },
+            {
+              "type": "action",
+              "label": "Open Bottles",
+              "operation": "bottles",
+              "detail": "",
+              "capability": "bottles"
+            }
+          ]
+        },
+        {
+          "title": "Capture",
+          "items": [
+            {
+              "type": "action",
+              "label": "Take a region screenshot",
+              "operation": "screenshot",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "support",
+              "label": "Frame overlays",
+              "capability": "game-overlay",
+              "detail": "Overlays require an installed and integrated tool such as MangoHud."
+            }
+          ]
+        }
+      ],
+      "legacy": -1
+    },
+    {
+      "id": "screentime",
+      "name": "Screen Time & Family",
+      "group": "Experience",
+      "icon": "screen-time",
+      "description": "Personal usage information without hidden tracking.",
+      "sections": [
+        {
+          "title": "Personal usage",
+          "items": [
+            {
+              "type": "preference",
+              "key": "usage.enabled"
+            },
+            {
+              "type": "preference",
+              "key": "usage.retention"
+            },
+            {
+              "type": "action",
+              "label": "Clear personal usage history",
+              "operation": "clear-usage",
+              "detail": "",
+              "capability": ""
+            }
+          ]
+        },
+        {
+          "title": "Healthy breaks",
+          "items": [
+            {
+              "type": "preference",
+              "key": "usage.breakReminders"
+            },
+            {
+              "type": "preference",
+              "key": "usage.breakMinutes"
+            }
+          ]
+        },
+        {
+          "title": "Family services",
+          "items": [
+            {
+              "type": "info",
+              "label": "No simulated family controls",
+              "detail": "Remote family sync, website filtering and app blocking are not presented as protections without an enforcing backend."
+            }
+          ]
+        }
+      ],
+      "legacy": -1
+    },
+    {
+      "id": "privacy",
+      "name": "Privacy & Security",
+      "group": "Privacy",
+      "icon": "privacy",
+      "description": "Understand the protections actually available.",
+      "sections": [
+        {
+          "title": "Protection",
+          "items": [
+            {
+              "type": "action",
+              "label": "Check firewall with administrator approval",
+              "operation": "firewall-status",
+              "detail": "",
+              "capability": "firewall"
+            },
+            {
+              "type": "action",
+              "label": "Review firewall changes",
+              "operation": "firewall-review",
+              "detail": "",
+              "capability": "firewall"
+            },
+            {
+              "type": "link",
+              "label": "Signed system updates",
+              "target": "updates",
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "title": "Application permissions",
+          "items": [
+            {
+              "type": "action",
+              "label": "Manage Flatpak permissions",
+              "operation": "flatseal",
+              "detail": "",
+              "capability": "flatseal"
+            },
+            {
+              "type": "info",
+              "label": "Permission boundary",
+              "detail": "Sandboxed applications use portal and Flatpak permissions. Unrestricted native applications are not protected by cosmetic permission switches."
+            }
+          ]
+        },
+        {
+          "title": "Your data",
+          "items": [
+            {
+              "type": "preference",
+              "key": "privacy.diagnostics"
+            },
+            {
+              "type": "action",
+              "label": "Export a diagnostic summary",
+              "operation": "export-diagnostics",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "link",
+              "label": "JARED permissions and history",
+              "target": "jared",
+              "detail": ""
+            },
+            {
+              "type": "link",
+              "label": "Personal usage data",
+              "target": "screentime",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "legacy": -1
+    },
+    {
+      "id": "jared",
+      "name": "JARED & Voice",
+      "group": "SOVEL Services",
+      "icon": "jared",
+      "description": "Local conversations and explicit action permissions.",
+      "sections": [
+        {
+          "title": "Local assistant",
+          "items": [
+            {
+              "type": "action",
+              "label": "Open Mini JARED",
+              "operation": "jared",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "preference",
+              "key": "jared.allowBasic"
+            },
+            {
+              "type": "preference",
+              "key": "jared.speak"
+            },
+            {
+              "type": "preference",
+              "key": "jared.idle"
+            }
+          ]
+        },
+        {
+          "title": "Voice and privacy",
+          "items": [
+            {
+              "type": "info",
+              "label": "Text and speech output",
+              "detail": "Text conversations and offline spoken replies are available. Voice recognition and wake phrases are not silently enabled."
+            },
+            {
+              "type": "link",
+              "label": "Microphone controls",
+              "target": "sound",
+              "detail": ""
+            },
+            {
+              "type": "link",
+              "label": "Privacy & Security",
+              "target": "privacy",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "legacy": -1
+    },
+    {
+      "id": "backup",
+      "name": "Backup & Recovery",
+      "group": "SOVEL Services",
+      "icon": "backup",
+      "description": "Keep recovery deliberate and verifiable.",
+      "sections": [
+        {
+          "title": "Backup tools",
+          "items": [
+            {
+              "type": "action",
+              "label": "Open backup application",
+              "operation": "backup-tool",
+              "detail": "",
+              "capability": "backup"
+            },
+            {
+              "type": "support",
+              "label": "System snapshots",
+              "capability": "snapshots",
+              "detail": "Automatic system rollback is shown only when a supported snapshot backend is installed and configured."
+            }
+          ]
+        },
+        {
+          "title": "Recovery",
+          "items": [
+            {
+              "type": "action",
+              "label": "Open disk utility",
+              "operation": "disks",
+              "detail": "",
+              "capability": "disks"
+            },
+            {
+              "type": "action",
+              "label": "Export a system summary",
+              "operation": "export-diagnostics",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "info",
+              "label": "Installation media",
+              "detail": "Reinstallation and disk formatting require explicit target selection. This page never erases a drive as a casual action."
+            }
+          ]
+        }
+      ],
+      "legacy": -1
+    },
+    {
+      "id": "updates",
+      "name": "SOVEL Update",
+      "group": "SOVEL Services",
+      "icon": "updates",
+      "description": "Signed updates, clear release identities and real history.",
+      "sections": [
+        {
+          "title": "Update preferences",
+          "items": [
+            {
+              "type": "info",
+              "label": "Stable release channel",
+              "detail": "Only the configured signed public channel is offered; unavailable Beta and Developer channels are not simulated."
+            },
+            {
+              "type": "action",
+              "label": "View update history",
+              "operation": "update-history",
+              "detail": "",
+              "capability": ""
+            }
+          ]
+        }
+      ],
+      "legacy": 6
+    },
+    {
+      "id": "developer",
+      "name": "Developer Options",
+      "group": "Advanced",
+      "icon": "developer",
+      "description": "Inspect development tools and services without hidden elevation.",
+      "sections": [
+        {
+          "title": "Tools",
+          "items": [
+            {
+              "type": "action",
+              "label": "Open Terminal",
+              "operation": "terminal",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "action",
+              "label": "Open system monitor",
+              "operation": "resources",
+              "detail": "",
+              "capability": "resources"
+            },
+            {
+              "type": "action",
+              "label": "Open Logs",
+              "operation": "logs",
+              "detail": "",
+              "capability": "logs"
+            }
+          ]
+        },
+        {
+          "title": "Diagnostics",
+          "items": [
+            {
+              "type": "action",
+              "label": "Refresh service and tool status",
+              "operation": "refresh",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "action",
+              "label": "Export diagnostic summary",
+              "operation": "export-diagnostics",
+              "detail": "",
+              "capability": ""
+            }
+          ]
+        },
+        {
+          "title": "Advanced changes",
+          "items": [
+            {
+              "type": "info",
+              "label": "Explicit authorization",
+              "detail": "Service, account, firewall and system-time changes require authenticated backends. Arbitrary shell execution is not exposed by this page."
+            }
+          ]
+        }
+      ],
+      "legacy": -1
+    },
+    {
+      "id": "about",
+      "name": "About SOVEL",
+      "group": "Advanced",
+      "icon": "sovel",
+      "description": "The identity, hardware and software behind this device.",
+      "sections": [
+        {
+          "title": "Device identity",
+          "items": [
+            {
+              "type": "action",
+              "label": "Rename this computer",
+              "operation": "hostname",
+              "detail": "",
+              "capability": "hostname"
+            },
+            {
+              "type": "action",
+              "label": "Export system information",
+              "operation": "export-diagnostics",
+              "detail": "",
+              "capability": ""
+            }
+          ]
+        },
+        {
+          "title": "Notices",
+          "items": [
+            {
+              "type": "action",
+              "label": "Open license notices",
+              "operation": "licenses",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "link",
+              "label": "Troubleshooting and recovery",
+              "target": "backup",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "legacy": 0
+    }
+  ],
+  "preferences": {
+    "appearance.mode": {
+      "label": "Appearance",
+      "kind": "choice",
+      "default": "dark",
+      "choices": [
+        "dark",
+        "light",
+        "automatic"
+      ],
+      "labels": [
+        "Dark",
+        "Light",
+        "Automatic"
+      ]
+    },
+    "appearance.accent": {
+      "label": "Accent color",
+      "kind": "color",
+      "default": "#B58BE8"
+    },
+    "appearance.density": {
+      "label": "Interface density",
+      "kind": "choice",
+      "default": "comfortable",
+      "choices": [
+        "comfortable",
+        "compact"
+      ],
+      "labels": [
+        "Comfortable",
+        "Compact"
+      ]
+    },
+    "reduceTransparency": {
+      "label": "Reduce transparency",
+      "kind": "switch",
+      "default": false,
+      "alias": "glass/low"
+    },
+    "appearance.font": {
+      "label": "Interface font",
+      "kind": "text",
+      "default": "Noto Sans",
+      "maxLength": 80
+    },
+    "appearance.textSize": {
+      "label": "Text size",
+      "kind": "slider",
+      "default": 13,
+      "minimum": 10,
+      "maximum": 22,
+      "unit": " px"
+    },
+    "reduceMotion": {
+      "label": "Reduce motion",
+      "kind": "switch",
+      "default": false,
+      "alias": "motion/reduced"
+    },
+    "shell.animationSpeed": {
+      "label": "Bar animation duration",
+      "kind": "slider",
+      "default": 220,
+      "minimum": 0,
+      "maximum": 600,
+      "step": 10,
+      "unit": " ms",
+      "alias": "shell/animationSpeed"
+    },
+    "shell.autoHide": {
+      "label": "Automatically hide the dock",
+      "kind": "switch",
+      "default": true,
+      "alias": "shell/autoHide"
+    },
+    "shell.activationEdge": {
+      "label": "Dock position",
+      "kind": "choice",
+      "default": "bottom",
+      "choices": [
+        "bottom",
+        "top",
+        "left",
+        "right"
+      ],
+      "labels": [
+        "Bottom",
+        "Top",
+        "Left",
+        "Right"
+      ],
+      "alias": "shell/activationEdge"
+    },
+    "shell.sensitivity": {
+      "label": "Activation sensitivity",
+      "kind": "slider",
+      "default": 8,
+      "minimum": 2,
+      "maximum": 24,
+      "unit": " px",
+      "alias": "shell/sensitivity"
+    },
+    "shell.revealDelay": {
+      "label": "Reveal delay",
+      "kind": "slider",
+      "default": 80,
+      "minimum": 0,
+      "maximum": 1000,
+      "step": 10,
+      "unit": " ms",
+      "alias": "shell/revealDelay"
+    },
+    "shell.hideDelay": {
+      "label": "Hide delay",
+      "kind": "slider",
+      "default": 450,
+      "minimum": 100,
+      "maximum": 2500,
+      "step": 10,
+      "unit": " ms",
+      "alias": "shell/hideDelay"
+    },
+    "desktop.workspaces": {
+      "label": "Workspaces",
+      "kind": "slider",
+      "default": 4,
+      "minimum": 1,
+      "maximum": 12,
+      "unit": ""
+    },
+    "desktop.snap": {
+      "label": "Snap windows to edges",
+      "kind": "switch",
+      "default": true
+    },
+    "bar.visible": {
+      "label": "Show menu bar",
+      "kind": "switch",
+      "default": true
+    },
+    "bar.autoHide": {
+      "label": "Automatically hide for maximized apps",
+      "kind": "switch",
+      "default": true
+    },
+    "bar.opacity": {
+      "label": "Background opacity",
+      "kind": "slider",
+      "default": 75,
+      "minimum": 25,
+      "maximum": 100,
+      "unit": "%"
+    },
+    "bar.show.network": {
+      "label": "Network",
+      "kind": "switch",
+      "default": true
+    },
+    "bar.show.bluetooth": {
+      "label": "Bluetooth",
+      "kind": "switch",
+      "default": true
+    },
+    "bar.show.sound": {
+      "label": "Sound",
+      "kind": "switch",
+      "default": true
+    },
+    "bar.show.battery": {
+      "label": "Battery when present",
+      "kind": "switch",
+      "default": true
+    },
+    "bar.show.notifications": {
+      "label": "Notifications",
+      "kind": "switch",
+      "default": true
+    },
+    "bar.show.downloads": {
+      "label": "Downloads",
+      "kind": "switch",
+      "default": false
+    },
+    "bar.show.updates": {
+      "label": "Software updates",
+      "kind": "switch",
+      "default": true
+    },
+    "bar.show.jared": {
+      "label": "JARED",
+      "kind": "switch",
+      "default": true
+    },
+    "bar.show.calendar": {
+      "label": "Date & time",
+      "kind": "switch",
+      "default": true
+    },
+    "clock.format": {
+      "label": "Time format",
+      "kind": "choice",
+      "default": "12h",
+      "choices": [
+        "12h",
+        "24h"
+      ],
+      "labels": [
+        "12 hour",
+        "24 hour"
+      ]
+    },
+    "clock.seconds": {
+      "label": "Show seconds",
+      "kind": "switch",
+      "default": false
+    },
+    "clock.weekday": {
+      "label": "Show day of week",
+      "kind": "switch",
+      "default": true
+    },
+    "widgets.visible": {
+      "label": "Show desktop widgets",
+      "kind": "switch",
+      "default": true
+    },
+    "widgets.animations": {
+      "label": "Animate widgets",
+      "kind": "switch",
+      "default": true
+    },
+    "widgets.snapToGrid": {
+      "label": "Snap widget placement to a 16-pixel grid",
+      "kind": "switch",
+      "default": false
+    },
+    "widgets.opacity": {
+      "label": "Widget opacity",
+      "kind": "slider",
+      "default": 75,
+      "minimum": 25,
+      "maximum": 100,
+      "unit": "%"
+    },
+    "weather.enabled": {
+      "label": "Allow weather network requests",
+      "kind": "switch",
+      "default": false
+    },
+    "search.recommendations": {
+      "label": "Show local app recommendations",
+      "kind": "switch",
+      "default": false
+    },
+    "input.repeatRate": {
+      "label": "Key repeat rate",
+      "kind": "slider",
+      "default": 25,
+      "minimum": 1,
+      "maximum": 80,
+      "unit": " /s"
+    },
+    "input.repeatDelay": {
+      "label": "Key repeat delay",
+      "kind": "slider",
+      "default": 600,
+      "minimum": 100,
+      "maximum": 2000,
+      "step": 50,
+      "unit": " ms"
+    },
+    "input.pointerSpeed": {
+      "label": "Pointer speed",
+      "kind": "slider",
+      "default": 0,
+      "minimum": -100,
+      "maximum": 100,
+      "unit": ""
+    },
+    "input.naturalScroll": {
+      "label": "Natural scrolling",
+      "kind": "switch",
+      "default": false
+    },
+    "input.leftHanded": {
+      "label": "Left-handed buttons",
+      "kind": "switch",
+      "default": false
+    },
+    "input.acceleration": {
+      "label": "Pointer acceleration",
+      "kind": "choice",
+      "default": "adaptive",
+      "choices": [
+        "adaptive",
+        "flat"
+      ],
+      "labels": [
+        "Adaptive",
+        "Flat"
+      ]
+    },
+    "input.tapToClick": {
+      "label": "Tap to click",
+      "kind": "switch",
+      "default": true,
+      "capability": "touchpad"
+    },
+    "input.disableWhileTyping": {
+      "label": "Disable while typing",
+      "kind": "switch",
+      "default": true,
+      "capability": "touchpad"
+    },
+    "notifications.focus": {
+      "label": "Do Not Disturb",
+      "kind": "switch",
+      "default": false,
+      "capability": "notifications"
+    },
+    "notifications.duration": {
+      "label": "Banner duration",
+      "kind": "slider",
+      "default": 7,
+      "minimum": 3,
+      "maximum": 30,
+      "unit": " seconds"
+    },
+    "notifications.history": {
+      "label": "Keep notification history",
+      "kind": "switch",
+      "default": true
+    },
+    "accessibility.highContrast": {
+      "label": "High contrast in Sovel settings",
+      "kind": "switch",
+      "default": false
+    },
+    "usage.enabled": {
+      "label": "Track active-app time locally",
+      "kind": "switch",
+      "default": false
+    },
+    "usage.retention": {
+      "label": "History retention",
+      "kind": "choice",
+      "default": 7,
+      "choices": [
+        7,
+        14,
+        30
+      ],
+      "labels": [
+        "7 days",
+        "14 days",
+        "30 days"
+      ]
+    },
+    "usage.breakReminders": {
+      "label": "Break reminders",
+      "kind": "switch",
+      "default": false
+    },
+    "usage.breakMinutes": {
+      "label": "Reminder interval",
+      "kind": "slider",
+      "default": 60,
+      "minimum": 15,
+      "maximum": 180,
+      "step": 5,
+      "unit": " minutes"
+    },
+    "privacy.diagnostics": {
+      "label": "Allow opt-in diagnostic export",
+      "kind": "switch",
+      "default": false
+    },
+    "jared.allowBasic": {
+      "label": "Allow basic actions explicitly requested",
+      "kind": "switch",
+      "default": false,
+      "alias": "jared/allowBasic",
+      "sensitive": true
+    },
+    "jared.speak": {
+      "label": "Read replies aloud",
+      "kind": "switch",
+      "default": false,
+      "alias": "jared/speak"
+    },
+    "jared.idle": {
+      "label": "Unload idle model after",
+      "kind": "choice",
+      "default": 120,
+      "choices": [
+        0,
+        60,
+        120,
+        300,
+        600
+      ],
+      "labels": [
+        "Keep loaded",
+        "1 minute",
+        "2 minutes",
+        "5 minutes",
+        "10 minutes"
+      ],
+      "alias": "jared/idle"
+    },
+    "bar.order": {
+      "label": "Status icon order",
+      "kind": "text",
+      "default": "network,bluetooth,sound,battery,notifications,updates,jared,search,control,calendar",
+      "maxLength": 160
+    },
+    "bar.show.search": {
+      "label": "App search",
+      "kind": "switch",
+      "default": true
+    },
+    "bar.show.control": {
+      "label": "Control Center",
+      "kind": "switch",
+      "default": true
+    },
+    "widgets.private": {
+      "label": "Hide personal widget content",
+      "kind": "switch",
+      "default": false
+    }
+  }
+}
