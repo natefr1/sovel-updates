@@ -1,0 +1,499 @@
+#!/usr/bin/python3 -I
+"""Sovel Private Workspace administration: setup, status, migration, backup.
+
+Private Mode is a separate Linux account. Its home directory is a
+systemd-homed LUKS2 image (AES-256-XTS, 512-bit volume key) that is only
+unlocked by that account's own authentication and is deactivated when its
+last session ends. Normal Mode never holds those keys.
+
+The private desktop runs on its own virtual terminal with its own greetd
+instance, so its compositor, clipboard, notifications, screenshots, search
+indexes and caches are separate processes owned by a separate user.
+
+Commands that change the system must run as root. `status` runs as any user
+and only reads public information.
+"""
+import argparse
+import configparser
+import datetime
+import grp
+import hashlib
+import json
+import os
+import pwd
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+CONFIG = Path('/etc/sovel/private.conf')
+GREETD_CONFIG = Path('/etc/sovel/private/greetd.toml')
+UNIT = Path('/etc/systemd/system/sovel-private-greetd.service')
+SSH_DROPIN = Path('/etc/ssh/sshd_config.d/60-sovel-private.conf')
+LIMITS = Path('/etc/security/limits.d/60-sovel-private.conf')
+SLEEP_DROPIN = Path('/etc/systemd/sleep.conf.d/60-sovel-private.conf')
+HOMED_PAM_PROFILE = Path('/usr/share/pam-configs/systemd-homed')
+GROUP = 'sovel-private'
+NAME = re.compile(r'^[a-z_][a-z0-9_-]{0,30}$')
+SIZE = re.compile(r'^[1-9][0-9]{0,5}[GT]$')
+SHORTCUTS = {'W-S-p': 'Super+Shift+P', 'W-A-p': 'Super+Alt+P', 'C-A-p': 'Ctrl+Alt+P'}
+# Membership in any of these lets an account read other users' data, read the
+# private session's logs, or become root. Normal Mode should not hold them.
+EXPOSING_GROUPS = ('sudo', 'wheel', 'adm', 'systemd-journal', 'lxd', 'docker', 'libvirt', 'disk')
+# Data the 0.1.0-9 JARED implementation stored in the Normal account.
+JARED_PATHS = ('.local/share/Sovel/JaredWorkspace', '.local/share/Sovel/Desktop/jared',
+               '.local/share/Sovel/voice-venv')
+ENV = {**os.environ, 'LC_ALL': 'C.UTF-8'}
+
+
+class Failure(Exception):
+    pass
+
+
+def run(args, check=True, capture=True, timeout=60, interactive=False):
+    try:
+        if interactive:
+            result = subprocess.run(args, env=ENV, timeout=None)
+        else:
+            result = subprocess.run(args, env=ENV, timeout=timeout, text=True,
+                                    stdin=subprocess.DEVNULL,
+                                    stdout=subprocess.PIPE if capture else None,
+                                    stderr=subprocess.PIPE if capture else None)
+    except FileNotFoundError as error:
+        raise Failure(f'{args[0]} is not installed.') from error
+    except subprocess.TimeoutExpired as error:
+        raise Failure(f'{args[0]} did not respond.') from error
+    if check and result.returncode:
+        detail = (getattr(result, 'stderr', '') or '').strip()
+        raise Failure(detail[:400] or f'{" ".join(args[:2])} failed with status {result.returncode}.')
+    return result
+
+
+def output(args, timeout=10):
+    try:
+        result = subprocess.run(args, env=ENV, timeout=timeout, text=True,
+                                stdin=subprocess.DEVNULL, capture_output=True)
+    except (OSError, subprocess.TimeoutExpired):
+        return ''
+    return result.stdout.strip() if result.returncode == 0 else ''
+
+
+def require_root():
+    if os.geteuid() != 0:
+        raise Failure('Run this command with sudo.')
+
+
+def read_config():
+    """Return the validated configuration, or None when Private Mode is not set up."""
+    parser = configparser.ConfigParser(interpolation=None)
+    try:
+        with CONFIG.open(encoding='utf-8') as handle:
+            parser.read_file(handle)
+    except (OSError, configparser.Error):
+        return None
+    if not parser.has_section('private'):
+        return None
+    section = parser['private']
+    user = section.get('user', '')
+    normal = section.get('normal_user', '')
+    shortcut = section.get('shortcut', 'W-S-p')
+    try:
+        normal_vt = int(section.get('normal_vt', '7'))
+        private_vt = int(section.get('private_vt', '8'))
+    except ValueError:
+        return None
+    if not NAME.match(user) or (normal and not NAME.match(normal)) or shortcut not in SHORTCUTS:
+        return None
+    if not (1 <= normal_vt <= 63 and 1 <= private_vt <= 63) or normal_vt == private_vt:
+        return None
+    return {'user': user, 'normal_user': normal, 'normal_vt': normal_vt,
+            'private_vt': private_vt, 'shortcut': shortcut}
+
+
+def write_atomic(path, text, mode=0o644):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile('w', encoding='utf-8', dir=path.parent, delete=False) as handle:
+        handle.write(text)
+        temporary = Path(handle.name)
+    os.chmod(temporary, mode)
+    temporary.replace(path)
+
+
+def homed_record(user):
+    text = output(['homectl', 'inspect', '--json=short', user])
+    if not text:
+        return {}
+    try:
+        record = json.loads(text)
+    except ValueError:
+        return {}
+    return record if isinstance(record, dict) else {}
+
+
+def record_state(record):
+    status = record.get('status')
+    if isinstance(status, dict):
+        for value in status.values():
+            if isinstance(value, dict) and isinstance(value.get('state'), str):
+                return value['state']
+    return 'unknown'
+
+
+def block_types(source):
+    """Device types from SOURCE down to its backing disk (e.g. part, crypt, disk)."""
+    if not source or not source.startswith('/dev/'):
+        return []
+    return output(['lsblk', '--inverse', '--noheadings', '--output', 'TYPE', source]).split()
+
+
+def mount_source(path):
+    return output(['findmnt', '--noheadings', '--output', 'SOURCE', '--target', str(path)]).split('[')[0]
+
+
+def swap_checks():
+    entries = []
+    try:
+        lines = Path('/proc/swaps').read_text(encoding='utf-8').splitlines()[1:]
+    except OSError:
+        return [{'id': 'swap', 'label': 'Swap', 'status': 'info', 'detail': 'Swap information is not readable.'}]
+    if not lines:
+        return [{'id': 'swap', 'label': 'Swap', 'status': 'ok', 'detail': 'No swap is active, so memory is never written to disk.'}]
+    for line in lines:
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        name, kind = parts[0], parts[1]
+        if name.startswith('/dev/zram'):
+            entries.append({'id': 'swap', 'label': 'Swap ' + name, 'status': 'ok', 'detail': 'Compressed RAM swap; nothing is written to disk.'})
+            continue
+        source = name if kind == 'partition' else mount_source(name)
+        encrypted = 'crypt' in block_types(source)
+        entries.append({'id': 'swap', 'label': 'Swap ' + name, 'status': 'ok' if encrypted else 'warn',
+                        'detail': 'Stored on an encrypted volume.' if encrypted else
+                        'Unencrypted swap can hold pages of private memory after you lock. Replace it with zram or encrypted swap.'})
+    return entries
+
+
+def isolation_report():
+    config = read_config()
+    checks = []
+    def add(identifier, label, status, detail):
+        checks.append({'id': identifier, 'label': label, 'status': status, 'detail': detail})
+    if not config:
+        add('configured', 'Private workspace', 'info', 'Not set up on this computer.')
+        return {'configured': False, 'checks': checks}
+    user = config['user']
+    record = homed_record(user)
+    if not record:
+        add('account', 'Private account', 'fail', f'{user} is not a systemd-homed account, or its record is not readable.')
+    else:
+        cipher = record.get('luksCipher', 'aes')
+        mode = record.get('luksCipherMode', 'xts-plain64')
+        size = int(record.get('luksVolumeKeySize') or 0)
+        storage = record.get('storage', '')
+        strong = storage == 'luks' and cipher == 'aes' and mode.startswith('xts') and size >= 64
+        bits = size * 4 if mode.startswith('xts') else size * 8
+        add('encryption', 'Private storage', 'ok' if strong else 'fail',
+            f'LUKS2 · {cipher.upper()}-{bits}-{mode.split("-")[0].upper()}' if storage == 'luks' and size else
+            f'Storage "{storage or "unknown"}" does not meet the AES-256-XTS requirement.')
+        state = record_state(record)
+        add('state', 'Encrypted home', 'info',
+            {'inactive': 'Sealed. The image is locked and its key is not in memory.',
+             'active': 'Open for the signed-in private session.',
+             'locked': 'Locked. Processes are frozen until the owner authenticates.'}.get(state, f'State: {state}.'))
+        add('recovery', 'Recovery key', 'ok' if record.get('recoveryKey') or record.get('recoveryKeyType') else 'info',
+            'A recovery key can unlock the private home if the password is lost.' if record.get('recoveryKey') or record.get('recoveryKeyType')
+            else 'Recovery key status is only visible to the private account and administrators.')
+    normal = config.get('normal_user')
+    if normal:
+        try:
+            groups = {g.gr_name for g in grp.getgrall() if normal in g.gr_mem}
+            groups.add(grp.getgrgid(pwd.getpwnam(normal).pw_gid).gr_name)
+        except KeyError:
+            groups = set()
+        if GROUP in groups:
+            add('normal-group', 'Normal account', 'fail', f'{normal} belongs to {GROUP}; Normal Mode must not.')
+        exposing = sorted(groups.intersection(EXPOSING_GROUPS))
+        add('normal-privilege', 'Normal account privileges', 'warn' if exposing else 'ok',
+            ('Normal Mode can read system logs or become administrator through: ' + ', '.join(exposing) +
+             '. Administrators can read an open private workspace.') if exposing else
+            'Normal Mode has no administrator or log-reading groups.')
+    service = output(['systemctl', 'is-active', 'sovel-private-greetd.service'])
+    add('greeter', 'Private sign-in', 'ok' if service == 'active' else 'warn',
+        f'Private greeter on VT {config["private_vt"]}: {service or "unknown"}.')
+    root_encrypted = 'crypt' in block_types(mount_source('/'))
+    add('disk', 'Full-disk encryption', 'ok' if root_encrypted else 'info',
+        'The system disk is encrypted.' if root_encrypted else
+        'The system disk is not encrypted. Private data stays encrypted; Normal files and system logs do not.')
+    checks.extend(swap_checks())
+    add('hibernation', 'Hibernation', 'ok' if SLEEP_DROPIN.is_file() else 'warn',
+        'Disabled, so memory and keys are never written to disk.' if SLEEP_DROPIN.is_file() else 'Hibernation is not explicitly disabled.')
+    add('coredumps', 'Crash dumps', 'ok' if LIMITS.is_file() else 'warn',
+        'Private processes cannot write memory dumps.' if LIMITS.is_file() else 'Core dump limits for private processes are not installed.')
+    if Path('/etc/ssh/sshd_config.d').is_dir():
+        add('ssh', 'Remote login', 'ok' if SSH_DROPIN.is_file() else 'warn',
+            'SSH refuses the private account.' if SSH_DROPIN.is_file() else 'SSH does not explicitly refuse the private account.')
+    linger = Path('/var/lib/systemd/linger') / user
+    add('linger', 'Background services', 'warn' if linger.exists() else 'ok',
+        'Lingering is enabled, which keeps the private home open after sign-out.' if linger.exists() else
+        'The private home closes when its last session ends.')
+    return {'configured': True, 'user': user, 'normalVt': config['normal_vt'], 'privateVt': config['private_vt'],
+            'shortcut': SHORTCUTS[config['shortcut']], 'checks': checks}
+
+
+def greetd_binary():
+    for candidate in ('/usr/sbin/greetd', '/usr/bin/greetd'):
+        if os.access(candidate, os.X_OK):
+            return candidate
+    found = shutil.which('greetd')
+    if not found:
+        raise Failure('greetd is not installed.')
+    return found
+
+
+def normal_vt():
+    """The VT the existing greetd instance runs on."""
+    try:
+        text = Path('/etc/greetd/config.toml').read_text(encoding='utf-8')
+    except OSError:
+        return 7
+    match = re.search(r'^\s*vt\s*=\s*(\d+)\s*$', text, re.MULTILINE)
+    return int(match.group(1)) if match else 7
+
+
+def setup_files(user, normal_user, normal_terminal, private_terminal, shortcut):
+    files = {
+        CONFIG: ('# Managed by sovel-private. Not read as shell code.\n[private]\n'
+                 f'user={user}\nnormal_user={normal_user}\nnormal_vt={normal_terminal}\n'
+                 f'private_vt={private_terminal}\nshortcut={shortcut}\n', 0o644),
+        GREETD_CONFIG: ('# Private Workspace greeter. Never switches VT on its own.\n'
+                        f'[terminal]\nvt = {private_terminal}\nswitch = false\n\n'
+                        '[general]\nrunfile = "/run/sovel-private-greetd.run"\n\n'
+                        '[default_session]\ncommand = "/usr/bin/sovel-greeter --private"\nuser = "sovel-greeter"\n', 0o644),
+        UNIT: ('[Unit]\nDescription=Sovel Private Workspace greeter\n'
+               'After=systemd-user-sessions.service systemd-homed.service greetd.service\n'
+               f'Wants=systemd-homed.service\nConflicts=getty@tty{private_terminal}.service\n'
+               'ConditionPathExists=/etc/sovel/private.conf\n\n'
+               f'[Service]\nType=simple\nExecStart={greetd_binary()} --config {GREETD_CONFIG}\n'
+               'Restart=always\nRestartSec=1\nIgnoreSIGPIPE=no\nSendSIGHUP=yes\nTimeoutStopSec=30s\nKeyringMode=shared\n\n'
+               '[Install]\nWantedBy=graphical.target\n', 0o644),
+        LIMITS: (f'# Private processes never write core dumps.\n@{GROUP} hard core 0\n@{GROUP} soft core 0\n', 0o644),
+        SLEEP_DROPIN: ('# Hibernation would write private memory and keys to disk.\n[Sleep]\n'
+                       'AllowHibernation=no\nAllowSuspendThenHibernate=no\nAllowHybridSleep=no\n', 0o644),
+    }
+    if Path('/etc/ssh/sshd_config.d').is_dir():
+        files[SSH_DROPIN] = (f'# Private Mode is console-only.\nDenyGroups {GROUP}\n', 0o644)
+    return files
+
+
+def setup(args):
+    require_root()
+    user, normal_user = args.user, args.normal_user or os.environ.get('SUDO_USER', '')
+    if not NAME.match(user):
+        raise Failure('Choose a lowercase account name such as nate-lab.')
+    if not normal_user or not NAME.match(normal_user):
+        raise Failure('Pass --normal-user with your everyday account name.')
+    try:
+        pwd.getpwnam(normal_user)
+    except KeyError as error:
+        raise Failure(f'The Normal account {normal_user} does not exist.') from error
+    if user == normal_user:
+        raise Failure('The private account must be different from the Normal account.')
+    if args.shortcut not in SHORTCUTS:
+        raise Failure('Choose one of: ' + ', '.join(SHORTCUTS))
+    if not SIZE.match(args.size):
+        raise Failure('Give the private disk size such as 64G or 1T.')
+    normal_terminal = normal_vt()
+    private_terminal = args.vt
+    if private_terminal == normal_terminal or not 1 <= private_terminal <= 63:
+        raise Failure(f'Choose a private VT other than {normal_terminal}.')
+    for tool in ('homectl', 'greetd', 'gtklock', 'gocryptfs'):
+        if not shutil.which(tool):
+            raise Failure(f'{tool} is required. Install the sovel-desktop dependencies first.')
+    existing = None
+    try:
+        existing = pwd.getpwnam(user)
+    except KeyError:
+        pass
+    plan = [f'Create group {GROUP}' if not group_exists() else f'Keep group {GROUP}',
+            'Enable systemd-homed and its PAM integration',
+            f'Keep existing homed account {user}' if existing else
+            f'Create {user}: LUKS2 home, AES-256-XTS (512-bit key), argon2id, {args.size}, umask 077, recovery key',
+            f'Run the private greeter on VT {private_terminal}; Normal stays on VT {normal_terminal}',
+            f'Private shortcut in Normal Mode: {SHORTCUTS[args.shortcut]}',
+            'Refuse SSH for the private account, disable its core dumps and system hibernation']
+    print('Sovel Private Workspace setup\n' + '\n'.join('  • ' + step for step in plan))
+    if args.dry_run:
+        print('Dry run: nothing was changed.')
+        return 0
+    if existing and not homed_record(user):
+        raise Failure(f'{user} already exists and is not a systemd-homed account. Choose another name.')
+    if not group_exists():
+        run(['groupadd', '--system', GROUP])
+    run(['systemctl', 'enable', '--now', 'systemd-homed.service'])
+    if HOMED_PAM_PROFILE.is_file() and shutil.which('pam-auth-update'):
+        run(['pam-auth-update', '--enable', 'systemd-homed'])
+    if not existing:
+        print(f'\nChoose the private password for {user}. It unlocks the encrypted home; it is never stored.')
+        print('homectl will then show a recovery key once. Write it down and keep it offline.\n')
+        run(['homectl', 'create', user, f'--real-name={args.real_name}', '--storage=luks', '--fs-type=ext4',
+             '--luks-cipher=aes', '--luks-cipher-mode=xts-plain64', '--luks-volume-key-size=64',
+             '--luks-pbkdf-type=argon2id', f'--disk-size={args.size}', '--umask=0077',
+             f'--member-of={GROUP}', '--recovery-key=yes', '--shell=/bin/bash'], interactive=True)
+        if not homed_record(user):
+            raise Failure('homectl did not create the private account.')
+    for path, (text, mode) in setup_files(user, normal_user, normal_terminal, private_terminal, args.shortcut).items():
+        write_atomic(path, text, mode)
+    linger = Path('/var/lib/systemd/linger') / user
+    if linger.exists():
+        run(['loginctl', 'disable-linger', user], check=False)
+    run(['systemctl', 'daemon-reload'])
+    run(['systemctl', 'enable', '--now', 'sovel-private-greetd.service'])
+    if SSH_DROPIN.is_file() and output(['systemctl', 'is-active', 'ssh']) == 'active':
+        run(['systemctl', 'reload', 'ssh'], check=False)
+    report = isolation_report()
+    print('\nPrivate Workspace is ready.')
+    print(f'  Sign in to Normal Mode, then press {SHORTCUTS[args.shortcut]} to open it.')
+    print('  Your existing JARED data is still in the Normal account. Move it with:')
+    print(f'    sudo sovel-private migrate-jared --from {normal_user}')
+    for check in report['checks']:
+        if check['status'] in ('warn', 'fail'):
+            print(f'  ! {check["label"]}: {check["detail"]}')
+    return 0
+
+
+def group_exists():
+    try:
+        grp.getgrnam(GROUP)
+        return True
+    except KeyError:
+        return False
+
+
+def migrate_jared(args):
+    """Copy JARED data out of the Normal account into the encrypted private home."""
+    require_root()
+    config = read_config()
+    if not config:
+        raise Failure('Set up Private Mode first.')
+    source_user = args.source or config['normal_user']
+    try:
+        source_home = Path(pwd.getpwnam(source_user).pw_dir)
+        target = pwd.getpwnam(config['user'])
+    except KeyError as error:
+        raise Failure('The Normal or private account does not exist.') from error
+    found = [relative for relative in JARED_PATHS if (source_home / relative).exists()]
+    if not found:
+        print(f'No JARED data was found in {source_home}.')
+        return 0
+    activated = False
+    if record_state(homed_record(config['user'])) != 'active':
+        print(f'Unlock {config["user"]} to copy into its encrypted home.')
+        run(['homectl', 'activate', config['user']], interactive=True)
+        activated = True
+    target_home = Path(target.pw_dir)
+    if not target_home.is_dir():
+        raise Failure('The private home did not open.')
+    try:
+        for relative in found:
+            destination = target_home / relative
+            if destination.exists():
+                raise Failure(f'{destination} already exists. Nothing was overwritten.')
+        for relative in found:
+            destination = target_home / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            run(['cp', '-a', '--no-preserve=ownership', str(source_home / relative), str(destination)], timeout=3600)
+            run(['chown', '-R', f'{target.pw_uid}:{target.pw_gid}', str(target_home / relative.split('/')[0])])
+            run(['chmod', '-R', 'go-rwx', str(destination)])
+            print(f'Copied {relative}')
+        if args.remove_source:
+            for relative in found:
+                shutil.rmtree(source_home / relative)
+                print(f'Removed {source_home / relative}')
+            print('Deleted files can remain recoverable on an unencrypted disk until overwritten.')
+        else:
+            print(f'The originals are still in {source_home}. Re-run with --remove-source after checking JARED in Private Mode.')
+    finally:
+        if activated:
+            run(['homectl', 'deactivate', config['user']], check=False)
+    return 0
+
+
+def backup(args):
+    """Copy the sealed LUKS2 image. The copy stays encrypted with the same keys."""
+    require_root()
+    config = read_config()
+    if not config:
+        raise Failure('Set up Private Mode first.')
+    record = homed_record(config['user'])
+    if record_state(record) != 'inactive':
+        raise Failure('Exit the private workspace first. Only a sealed image can be copied consistently.')
+    image = Path(record.get('imagePath') or f'/home/{config["user"]}.home')
+    if not image.is_file():
+        raise Failure(f'The private image {image} was not found.')
+    destination = Path(args.destination).resolve()
+    if not destination.is_dir():
+        raise Failure('Choose an existing destination folder, such as a mounted backup drive.')
+    stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
+    copy = destination / f'{config["user"]}-{stamp}.home'
+    run(['cp', '--sparse=always', str(image), str(copy)], timeout=None)
+    digest = hashlib.sha256()
+    with copy.open('rb') as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b''):
+            digest.update(block)
+    copy.with_suffix('.home.sha256').write_text(f'{digest.hexdigest()}  {copy.name}\n', encoding='utf-8')
+    os.chmod(copy, 0o600)
+    print(f'Encrypted backup: {copy}')
+    print('It opens only with the private password or recovery key. To restore, place it at '
+          f'{image} on a system running systemd-homed while the account is signed out.')
+    return 0
+
+
+def disable(_args):
+    require_root()
+    run(['systemctl', 'disable', '--now', 'sovel-private-greetd.service'], check=False)
+    print('The private greeter is disabled. The encrypted account and its data were not changed.')
+    return 0
+
+
+def main():
+    parser = argparse.ArgumentParser(prog='sovel-private', description=__doc__.splitlines()[0])
+    commands = parser.add_subparsers(dest='command', required=True)
+    create = commands.add_parser('setup', help='Create the private account and its greeter')
+    create.add_argument('--user', required=True, help='Private account name, e.g. nate-lab')
+    create.add_argument('--normal-user', help='Everyday account (default: the sudo caller)')
+    create.add_argument('--real-name', default='Private Workspace')
+    create.add_argument('--size', default='64G', help='Encrypted image size, e.g. 64G')
+    create.add_argument('--vt', type=int, default=8, help='Private VT (default 8)')
+    create.add_argument('--shortcut', default='W-S-p', choices=sorted(SHORTCUTS))
+    create.add_argument('--dry-run', action='store_true')
+    status = commands.add_parser('status', help='Report isolation and encryption status')
+    status.add_argument('--json', action='store_true')
+    move = commands.add_parser('migrate-jared', help='Move JARED data from Normal into Private')
+    move.add_argument('--from', dest='source')
+    move.add_argument('--remove-source', action='store_true')
+    save = commands.add_parser('backup', help='Copy the sealed encrypted image')
+    save.add_argument('destination')
+    commands.add_parser('disable', help='Disable the private greeter, keeping all data')
+    args = parser.parse_args()
+    if args.command == 'status':
+        report = isolation_report()
+        if args.json:
+            print(json.dumps(report, ensure_ascii=False))
+        else:
+            for check in report['checks']:
+                print(f'[{check["status"]:>4}] {check["label"]}: {check["detail"]}')
+        return 0
+    return {'setup': setup, 'migrate-jared': migrate_jared, 'backup': backup, 'disable': disable}[args.command](args)
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except Failure as error:
+        print(f'sovel-private: {error}', file=sys.stderr)
+        sys.exit(1)
+    except KeyboardInterrupt:
+        sys.exit(130)

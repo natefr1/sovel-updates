@@ -201,6 +201,16 @@ void Windows::closeActive(){
     if(auto *e=d->active()){zwlr_foreign_toplevel_handle_v1_close(e->handle);d->flush();}
 #endif
 }
+int Windows::closeAll(){
+#ifdef SOVEL_LAYER_SHELL
+    int asked=0;
+    for(auto &e:d->items){zwlr_foreign_toplevel_handle_v1_close(e->handle);++asked;}
+    d->flush();return asked;
+#else
+    return 0;
+#endif
+}
+int Windows::count()const{return int(d->items.size());}
 void Windows::minimizeActive(){
 #ifdef SOVEL_LAYER_SHELL
     if(auto *e=d->active()){zwlr_foreign_toplevel_handle_v1_set_minimized(e->handle);d->flush();}

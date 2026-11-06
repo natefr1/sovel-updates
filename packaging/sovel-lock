@@ -1,12 +1,54 @@
 #!/bin/sh
 set -eu
 # gtklock owns real ext-session-lock surfaces and delegates authentication to PAM.
+# With --wait this script exits 0 only after gtklock reports that every output
+# is covered (its --lock-command runs once the session lock is confirmed).
 command -v gtklock >/dev/null || { echo 'Sovel: secure locker not installed' >&2; exit 1; }
-test -n "${XDG_RUNTIME_DIR:-}" || { echo 'Sovel: no session runtime' >&2; exit 1; }
+runtime=${XDG_RUNTIME_DIR:-}
+test -n "$runtime" || { echo 'Sovel: no session runtime' >&2; exit 1; }
+wait_for_lock=false
+case "${1:-}" in
+  --wait) wait_for_lock=true ;;
+  "") ;;
+  *) echo 'Usage: sovel-lock [--wait]' >&2; exit 2 ;;
+esac
+state="$runtime/sovel-lock.state"
+guard="$runtime/sovel-lock.guard"
 style=/usr/share/sovel/lock/animated.css
 preferences="${XDG_CONFIG_HOME:-$HOME/.config}/Sovel/Desktop.conf"
-if test -r "$preferences" && grep -q '^reduced=true$' "$preferences"; then
+if test -r "$preferences" && grep -Eq '^(reduced|low)=true$' "$preferences"; then
     style=/usr/share/sovel/lock/style.css
 fi
 export GDK_BACKEND=wayland
-exec flock --nonblock --conflict-exit-code 0 "$XDG_RUNTIME_DIR/sovel-lock.guard" gtklock --config /usr/share/sovel/lock/config.ini --style "$style"
+# A stale marker from a crashed locker must not count as a confirmation.
+if flock --nonblock "$guard" true; then rm -f "$state"; fi
+run_locker() {
+    flock --nonblock --conflict-exit-code 75 "$guard" \
+        gtklock --config /usr/share/sovel/lock/config.ini --style "$style" \
+        --lock-command "/usr/bin/touch $state" --unlock-command "/usr/bin/rm -f $state"
+}
+if ! $wait_for_lock; then
+    status=0
+    run_locker || status=$?
+    test "$status" -eq 75 && exit 0
+    exit "$status"
+fi
+# The locker outlives this script; it must not hold the caller's pipes open.
+# dash ignores redirections on a backgrounded function call, so use a subshell.
+( run_locker ) </dev/null >/dev/null 2>&1 &
+locker=$!
+attempt=0
+while test "$attempt" -lt 80; do
+    test -e "$state" && exit 0
+    if ! kill -0 "$locker" 2>/dev/null; then
+        status=0
+        wait "$locker" || status=$?
+        # Another locker already holds the session lock.
+        if test "$status" -eq 75 && test -e "$state"; then exit 0; fi
+        exit 1
+    fi
+    sleep 0.1
+    attempt=$((attempt + 1))
+done
+echo 'Sovel: the secure locker did not confirm the lock' >&2
+exit 1

@@ -1,0 +1,147 @@
+#!/usr/bin/python3 -I
+"""Sovel Vault: a second encrypted layer inside the private workspace.
+
+The Vault is a gocryptfs folder (AES-256-GCM file contents, scrypt key
+derivation) with its own passphrase, separate from the private account
+password. It mounts at ~/Vault only after that passphrase is given, unmounts
+after 15 idle minutes, and is closed whenever Sovel locks.
+
+Passphrases are read from standard input, passed to gocryptfs through a pipe,
+and never written to disk, logs or command lines.
+"""
+import grp
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+GROUP = 'sovel-private'
+DATA = Path(os.environ.get('XDG_DATA_HOME', Path.home() / '.local/share')) / 'Sovel' / 'Vault'
+CIPHER = DATA / 'cipher'
+MOUNT = Path.home() / 'Vault'
+IDLE = '15m'
+MINIMUM = 12
+WRONG_PASSWORD = 12  # gocryptfs exit code for an incorrect password
+
+
+def private_mode():
+    try:
+        gid = grp.getgrnam(GROUP).gr_gid
+    except KeyError:
+        return False
+    return gid == os.getgid() or gid in os.getgroups()
+
+
+def mounted():
+    target = str(MOUNT)
+    try:
+        for line in Path('/proc/self/mountinfo').read_text(encoding='utf-8').splitlines():
+            left, _separator, right = line.partition(' - ')
+            fields = left.split()
+            if len(fields) > 4 and fields[4].replace('\\040', ' ') == target and right.startswith('fuse.gocryptfs'):
+                return True
+    except OSError:
+        pass
+    return False
+
+
+def initialized():
+    return (CIPHER / 'gocryptfs.conf').is_file()
+
+
+def read_secret():
+    raw = sys.stdin.buffer.read(4097)
+    if len(raw) > 4096:
+        raise ValueError('The passphrase is too long.')
+    secret = raw.decode('utf-8').rstrip('\r\n')
+    if '\n' in secret or '\0' in secret:
+        raise ValueError('The passphrase must be a single line.')
+    return secret
+
+
+def gocryptfs(args, secret):
+    tool = shutil.which('gocryptfs')
+    if not tool:
+        raise ValueError('gocryptfs is not installed.')
+    return subprocess.run([tool, '-q', '-passfile', '/dev/stdin', *args], input=(secret + '\n').encode('utf-8'),
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
+
+
+def status():
+    return {'initialized': initialized(), 'mounted': mounted(), 'mountpoint': str(MOUNT)}
+
+
+def init():
+    if initialized():
+        raise ValueError('The Vault already exists.')
+    secret = read_secret()
+    if len(secret) < MINIMUM:
+        raise ValueError(f'Use a Vault passphrase of at least {MINIMUM} characters.')
+    CIPHER.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.chmod(DATA, 0o700)
+    result = gocryptfs(['-init', str(CIPHER)], secret)
+    secret = ''
+    if result.returncode:
+        raise ValueError('The Vault could not be created.')
+    text = result.stdout.decode('utf-8', 'replace')
+    key = ''
+    for line in text.splitlines():
+        if line.count('-') >= 7 and all(part.strip().isalnum() for part in line.strip().split('-')):
+            key = line.strip()
+    return {**status(), 'masterKey': key,
+            'message': 'Vault created. Store the master key offline; it can recover the Vault if the passphrase is lost.'}
+
+
+def unlock():
+    if not initialized():
+        raise ValueError('Create the Vault first.')
+    if mounted():
+        return {**status(), 'message': 'The Vault is already open.'}
+    secret = read_secret()
+    MOUNT.mkdir(mode=0o700, exist_ok=True)
+    os.chmod(MOUNT, 0o700)
+    result = gocryptfs(['-idle', IDLE, str(CIPHER), str(MOUNT)], secret)
+    secret = ''
+    if result.returncode == WRONG_PASSWORD:
+        raise ValueError('That Vault passphrase is not correct.')
+    if result.returncode or not mounted():
+        raise ValueError('The Vault could not be opened.')
+    return {**status(), 'message': 'Vault open. It closes after 15 idle minutes and whenever Sovel locks.'}
+
+
+def lock():
+    if not mounted():
+        return {**status(), 'message': 'The Vault is closed.'}
+    tool = shutil.which('fusermount3') or shutil.which('fusermount')
+    if not tool:
+        raise ValueError('fusermount is not installed.')
+    result = subprocess.run([tool, '-u', str(MOUNT)], stdin=subprocess.DEVNULL, capture_output=True, timeout=15)
+    if result.returncode or mounted():
+        raise BlockingIOError('Files in the Vault are still open. Close them, then lock it again.')
+    return {**status(), 'message': 'The Vault is closed and encrypted.'}
+
+
+def main():
+    if not private_mode():
+        print(json.dumps({'error': 'The Vault is available only in the private workspace.'}))
+        return 2
+    action = sys.argv[1] if len(sys.argv) > 1 else 'status'
+    handlers = {'status': status, 'init': init, 'unlock': unlock, 'lock': lock}
+    if action not in handlers:
+        print(json.dumps({'error': 'Use status, init, unlock or lock.'}))
+        return 2
+    try:
+        print(json.dumps(handlers[action]()))
+        return 0
+    except BlockingIOError as error:
+        print(json.dumps({**status(), 'error': str(error)}))
+        return 1
+    except (ValueError, OSError, subprocess.SubprocessError, UnicodeError) as error:
+        print(json.dumps({**status(), 'error': str(error)[:300]}))
+        return 3
+
+
+if __name__ == '__main__':
+    sys.exit(main())

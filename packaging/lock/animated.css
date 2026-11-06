@@ -1,6 +1,7 @@
 @import url("style.css");
-@keyframes quiet-room {
-    from { background-size: 108% 108%; background-position: 45% 50%; }
-    to { background-size: 112% 112%; background-position: 55% 48%; }
+/* A slow drift over the skyline. Reduced motion and low effects use style.css. */
+@keyframes city-drift {
+    from { background-size: 104% 104%; background-position: 48% 50%; }
+    to { background-size: 107% 107%; background-position: 52% 49%; }
 }
-window { animation: quiet-room 28s ease-in-out infinite alternate; }
+window { animation: city-drift 40s ease-in-out infinite alternate; }

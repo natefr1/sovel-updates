@@ -40,6 +40,8 @@ public:
  static QString assistantStatePath();
  Q_INVOKABLE void assistantCommand(const QString &action,const QString &text={});
  Q_INVOKABLE QString addWidget(const QString &type);
+ Q_INVOKABLE bool applyPreset(const QString &name,const QStringList &outputs,const QString &primary);
+ Q_INVOKABLE void initializePrivateLayout(const QStringList &outputs,const QString &primary);
  Q_INVOKABLE void removeWidget(const QString &id);
  Q_INVOKABLE bool moveWidget(const QString &id,double x,double y);
  Q_INVOKABLE bool placeWidget(const QString &id,const QString &output,double x,double y,int width,int height);

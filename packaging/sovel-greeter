@@ -15,8 +15,16 @@ case "$rendering" in
   software-gl) export WLR_RENDERER=pixman QT_QUICK_BACKEND=rhi LIBGL_ALWAYS_SOFTWARE=1 QSG_RHI_BACKEND=opengl ;;
   *) echo 'Sovel: invalid /etc/sovel/rendering (expected auto, software or software-gl)' >&2; exit 2 ;;
 esac
+# The private greeter on its own VT asks only for the private password.
+greeter_args=--greeter
+case "${1:-}" in
+  --private) greeter_args="--greeter --private" ;;
+  "") ;;
+  *) echo 'Usage: sovel-greeter [--private]' >&2; exit 2 ;;
+esac
 export QT_QPA_PLATFORM=wayland
 export QT_QUICK_CONTROLS_STYLE=Basic
 export SOVEL_GREETER_KIOSK=1
 unset QT_WAYLAND_SHELL_INTEGRATION
-exec cage -s -- /usr/bin/sovel --greeter
+# shellcheck disable=SC2086 # fixed, unquoted word list
+exec cage -s -- /usr/bin/sovel $greeter_args

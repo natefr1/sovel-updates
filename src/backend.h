@@ -24,6 +24,11 @@ class Backend : public QObject {
     Q_PROPERTY(QVariantMap shellPreferences READ shellPreferences NOTIFY preferencesChanged)
     Q_PROPERTY(QString networkReport READ networkReport NOTIFY networkChanged)
     Q_PROPERTY(QVariantMap power READ power NOTIFY powerChanged)
+    Q_PROPERTY(QString mode READ mode CONSTANT)
+    Q_PROPERTY(bool privateMode READ privateMode CONSTANT)
+    Q_PROPERTY(bool privateConfigured READ privateConfigured CONSTANT)
+    Q_PROPERTY(QVariantMap vault READ vault NOTIFY vaultChanged)
+    Q_PROPERTY(bool vaultBusy READ vaultBusy NOTIFY vaultChanged)
 public:
     explicit Backend(QObject *parent=nullptr);
     QVariantMap metrics() const { return m_metrics; }
@@ -72,6 +77,15 @@ public:
     QVariantMap shellPreferences()const;
     Q_INVOKABLE void setShellPreference(const QString &name,const QVariant &value);
     Q_INVOKABLE void message(const QString &text);
+    QString mode()const;
+    bool privateMode()const;
+    bool privateConfigured()const;
+    // The greeter leaves the private VT through logind; polkit allows this for the active seat session.
+    Q_INVOKABLE bool switchToNormalDesktop();
+    QVariantMap vault()const{return m_vault;}
+    bool vaultBusy()const{return m_vaultBusy;}
+    Q_INVOKABLE void refreshVault();
+    Q_INVOKABLE void vaultAction(const QString &action,QString passphrase=QString());
 signals:
     void metricsChanged();
     void preferencesChanged();
@@ -80,7 +94,10 @@ signals:
     void audioChanged();
     void networkChanged();
     void powerChanged();
+    void vaultChanged();
 private:
+    QVariantMap m_vault;
+    bool m_vaultBusy=false;
     QStringList dockIds()const;
     void sample();
     QSettings m_settings;

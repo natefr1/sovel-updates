@@ -1,5 +1,8 @@
 #include "backend.h"
 #include "release.h"
+#include "sovelmode.h"
+#include <QDBusConnection>
+#include <QDBusMessage>
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDesktopServices>
@@ -47,7 +50,50 @@ bool Backend::reducedMotion() const { return m_settings.value("motion/reduced",f
 bool Backend::lowEffects() const { return m_settings.value("glass/low",false).toBool(); }
 void Backend::setReducedMotion(bool v){ m_settings.setValue("motion/reduced",v);emit preferencesChanged(); }
 void Backend::setLowEffects(bool v){ m_settings.setValue("glass/low",v);emit preferencesChanged(); }
-QString Backend::wallpaper() const { return m_settings.value("appearance/wallpaper","landscape").toString(); }
+QString Backend::wallpaper() const {
+    // Normal Mode is the everyday city; Private Mode is the white spider emblem.
+    const auto fallback=SovelMode::isPrivate()?QStringLiteral("emblem"):QStringLiteral("city");
+    const auto value=m_settings.value("appearance/wallpaper",fallback).toString();
+    static const QStringList known{"city","emblem","lab","landscape","lockroom"};
+    // Earlier releases defaulted to "landscape"; an untouched value follows the mode.
+    if(!known.contains(value)||(value=="landscape"&&!m_settings.value("appearance/wallpaperChosen",false).toBool()))return fallback;
+    return value;
+}
+QString Backend::mode()const{return SovelMode::name();}
+bool Backend::privateMode()const{return SovelMode::isPrivate();}
+bool Backend::privateConfigured()const{return SovelMode::configured();}
+bool Backend::switchToNormalDesktop(){
+    if(!SovelMode::configured())return false;
+    auto call=QDBusMessage::createMethodCall("org.freedesktop.login1","/org/freedesktop/login1/seat/self","org.freedesktop.login1.Seat","SwitchTo");
+    call.setArguments({QVariant::fromValue<quint32>(quint32(SovelMode::normalTerminal()))});
+    const auto reply=QDBusConnection::systemBus().call(call,QDBus::Block,5000);
+    if(reply.type()==QDBusMessage::ErrorMessage){message("Could not return to the desktop.");return false;}
+    return true;
+}
+void Backend::refreshVault(){vaultAction("status");}
+void Backend::vaultAction(const QString &action,QString passphrase){
+    static const QStringList allowed{"status","init","unlock","lock"};
+    if(!SovelMode::isPrivate()||!allowed.contains(action)||(m_vaultBusy&&action!="status")){passphrase.fill(QChar(0));return;}
+    if((action=="init"||action=="unlock")&&passphrase.isEmpty()){m_vault["error"]="Enter the Vault passphrase.";emit vaultChanged();return;}
+    auto *process=new QProcess(this);
+    m_vaultBusy=action!="status";emit vaultChanged();
+    connect(process,qOverload<int,QProcess::ExitStatus>(&QProcess::finished),this,[this,process,action](int,QProcess::ExitStatus){
+        auto result=QJsonDocument::fromJson(process->readAllStandardOutput().left(65536)).object().toVariantMap();
+        if(result.isEmpty())result={{"error","The Vault service did not respond."}};
+        result["action"]=action;m_vault=result;m_vaultBusy=false;emit vaultChanged();process->deleteLater();
+        if(action=="unlock"&&!result.contains("error"))QProcess::startDetached(QCoreApplication::applicationFilePath(),{"--open-folder",result.value("mountpoint").toString()});
+    });
+    connect(process,&QProcess::errorOccurred,this,[this,process](QProcess::ProcessError error){
+        if(error!=QProcess::FailedToStart)return;
+        m_vault={{"error","The Vault tool is not installed."}};m_vaultBusy=false;emit vaultChanged();process->deleteLater();
+    });
+    process->start("/usr/bin/sovel-vault",{action});
+    if(action=="init"||action=="unlock"){
+        auto bytes=passphrase.toUtf8()+'\n';process->write(bytes);bytes.fill('\0');
+    }
+    passphrase.fill(QChar(0));
+    process->closeWriteChannel();
+}
 void Backend::claimMenu(QObject *menu){
     if(m_openMenu&&m_openMenu!=menu)QMetaObject::invokeMethod(m_openMenu,"close");
     m_openMenu=menu;
@@ -86,7 +132,8 @@ void Backend::openWallpaperPicker(){
     if(!launchManaged("/usr/libexec/sovel-waypaper",{}))message("Waypaper is unavailable. Install the wallpaper tools update.");
 }
 void Backend::setWallpaper(const QString &v){
-    if(v!="landscape" && v!="lockroom")return;
+    if(v!="landscape" && v!="lockroom" && v!="city" && v!="emblem" && v!="lab")return;
+    m_settings.setValue("appearance/wallpaperChosen",true);
     m_settings.setValue("appearance/external",false);launchManaged("/usr/libexec/sovel-wallpaper-stop",{});
     m_settings.remove("appearance/photo");m_settings.setValue("appearance/wallpaper",v);m_settings.sync();emit preferencesChanged();
 }
@@ -252,19 +299,25 @@ void Backend::launch(const QString &app){
         const auto foot=QStandardPaths::findExecutable("foot");
         if(foot.isEmpty())message("Terminal backend (foot) is not installed.");
         else launchManaged(foot,{});
-    } else if(app=="lock") {
+    } else if(app=="lock" || app=="exit-private") {
+        // sovel-mode confirms the lock before anything else happens and, in
+        // Private Mode, returns to the Normal lock screen.
+        if(app=="exit-private"&&!SovelMode::isPrivate())return;
         auto *locker=new QProcess(this);
-        connect(locker,&QProcess::errorOccurred,this,[this,locker](QProcess::ProcessError){message("Secure lock service is unavailable.");locker->deleteLater();});
-        connect(locker,qOverload<int,QProcess::ExitStatus>(&QProcess::finished),this,[this,locker](int code,QProcess::ExitStatus status){
-            if(code!=0 || status!=QProcess::NormalExit)message("Secure lock could not be established. Your session may still be unlocked.");
+        connect(locker,&QProcess::errorOccurred,this,[this,locker](QProcess::ProcessError error){if(error==QProcess::FailedToStart){message("Secure lock service is unavailable.");locker->deleteLater();}});
+        connect(locker,qOverload<int,QProcess::ExitStatus>(&QProcess::finished),this,[this,locker,app](int code,QProcess::ExitStatus status){
+            if(app=="lock"&&(code!=0 || status!=QProcess::NormalExit))message("Secure lock could not be established. Your session may still be unlocked.");
             locker->deleteLater();
         });
-        locker->start("/usr/bin/sovel-lock",{});
+        locker->start("/usr/bin/sovel-mode",{app});
+    } else if(app=="vault") {
+        if(SovelMode::isPrivate()&&!launchManaged(QCoreApplication::applicationFilePath(),{"--app","vault"}))message("The Vault could not be opened.");
     } else if(app=="jared")launchJared({});
 }
 QStringList Backend::dockIds()const{
     if(m_settings.contains("dock/order"))return m_settings.value("dock/order").toStringList();
     auto ids=QStringList{"sovel:files","sovel:terminal","sovel:settings","sovel:store"};
+    if(SovelMode::isPrivate())ids<<"sovel:jared"<<"sovel:vault";
     for(const auto &id:m_settings.value("dock/pins").toStringList())if(!ids.contains(id))ids<<id;
     return ids;
 }
@@ -295,18 +348,21 @@ void Backend::movePinned(const QString &id,int direction){
     const auto target=qBound(0,int(index)+(direction<0?-1:1),int(ids.size())-1);ids.move(index,target);setDockOrder(ids);
 }
 void Backend::launchJared(const QString &prompt){
+    if(!SovelMode::isPrivate()){message("This app is not available.");return;}
     if(!launchManaged(QCoreApplication::applicationFilePath(),{"--app","jared","--jared-prompt",prompt.left(2000)}))message("JARED could not be opened.");
 }
 QVariantList Backend::applications(bool refresh) const {
     const auto now=QDateTime::currentMSecsSinceEpoch();
     if(!refresh&&m_applicationCacheTime&&now-m_applicationCacheTime<2000)return m_applicationCache;
     QVariantList result;
-    for(const auto &id:QStringList{"files","settings","store","terminal","jared"}){
+    QStringList builtIn{"files","settings","store","terminal"};
+    if(SovelMode::isPrivate())builtIn<<"jared"<<"vault";
+    for(const auto &id:builtIn){
         QString name=id;name[0]=name[0].toUpper();if(id=="jared")name="JARED";
         result.append(QVariantMap{{"id","sovel:"+id},{"name",name},{"icon","qrc:/assets/icons/"+id+".svg"},{"appIds",QStringList{id=="terminal"?"foot":"sovel-"+id}}});
     }
     QSet<QString> seen;
-    QSet<QString> names{"files","settings","terminal","store","app library","jared"};
+    QSet<QString> names{"files","settings","terminal","store","app library","jared","vault"};
     const QSet<QString> replaced{"org.gnome.Nautilus.desktop","org.gnome.Settings.desktop","gnome-control-center.desktop","org.gnome.Terminal.desktop","org.gnome.Console.desktop","foot.desktop","footclient.desktop","foot-server.desktop"};
     QStringList roots=QStandardPaths::standardLocations(QStandardPaths::GenericDataLocation);
     roots<<QDir::homePath()+"/.local/share/flatpak/exports/share"<<"/var/lib/flatpak/exports/share"<<"/var/lib/snapd/desktop";

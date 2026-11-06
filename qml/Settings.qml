@@ -28,7 +28,13 @@ Item {
   if(operation==="wallpaper-image"){photoPicker.open();return}
   if(operation==="wallpaper-picker"){System.openWallpaperPicker();return}
   if(operation==="lock"){System.launch("lock");return}
-  if(["files","library","store","jared","terminal"].includes(operation)){System.launch(operation);return}
+  if(["files","library","store","jared","terminal","vault","exit-private"].includes(operation)){System.launch(operation);return}
+  if(operation.startsWith("preset-")){
+   const outputs=(typeof Displays!=="undefined"&&Displays?Displays.outputs:[]).filter(o=>o.enabled!==false).map(o=>o.name)
+   const ok=Workspace.applyPreset(operation.slice(7),outputs,typeof Displays!=="undefined"&&Displays?Displays.primary:"")
+   root.actionResult={message:ok?(outputs.length>1?"The layout is on your secondary display. Drag or resize any widget to adjust it.":"Only one display is connected, so the layout was placed on it. It moves to the secondary display when you apply it again with two displays."):"The layout could not be applied.",rows:[]}
+   root.dialogOperation=operation;resultDialog.open();return
+  }
   if(operation==="export-profile"){profileExport.open();return}
   if(operation==="import-profile"){profileImport.open();return}
   if(operation==="export-diagnostics"){if(!SettingsService.preferences["privacy.diagnostics"]){diagnosticConsent.open();return}SettingsService.refresh("about",true);SettingsService.refresh("developer",true);diagnosticExport.open();return}

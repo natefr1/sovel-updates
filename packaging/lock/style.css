@@ -1,39 +1,41 @@
+/* One lock screen for every session. Normal and Private Mode use this same
+   file, so a locked computer never reveals which workspace was open. */
 window {
-    background-image: linear-gradient(rgba(16,8,30,.24),rgba(16,8,30,.35)),url("../assets/lockroom.png");
+    background-image: linear-gradient(rgba(6,10,24,.10),rgba(6,10,24,.42)),url("../assets/city.png");
     background-size: cover;
     background-repeat: no-repeat;
     background-position: center;
-    background-color: #10091c;
-    color: #f4edff;
-    font-family: sans;
+    background-color: #0b1020;
+    color: #f2f4f8;
+    font-family: "Noto Sans", sans-serif;
 }
 #window-box {
-    background-color: rgba(20,12,34,.76);
-    border: 1px solid rgba(235,214,255,.42);
-    border-radius: 30px;
-    padding: 40px;
-    box-shadow: 0 24px 80px rgba(0,0,0,.4),inset 0 1px rgba(255,255,255,.22);
+    background-color: rgba(20,24,34,.58);
+    border: 1px solid rgba(255,255,255,.22);
+    border-radius: 28px;
+    padding: 36px 40px 30px;
+    box-shadow: 0 30px 90px rgba(0,0,0,.45), inset 0 1px rgba(255,255,255,.30), inset 0 -1px rgba(0,0,0,.35);
 }
-#clock-label { font-size: 76px; font-weight: 300; color: #faf6ff; }
-#date-label { font-size: 15px; color: #d9caed; margin-bottom: 28px; }
-#input-label { font-size: 12px; color: #cbb9df; margin-right: 10px; }
+#clock-label { font-size: 96px; font-weight: 200; color: #ffffff; letter-spacing: -3px; }
+#date-label { font-size: 16px; color: #d4d9e4; margin-bottom: 26px; }
+#input-label { font-size: 12px; color: #c9cfda; margin-right: 10px; }
 #input-field {
-    background: rgba(12,7,22,.6);
-    color: #f4edff;
-    border: 1px solid #9b76c2;
+    background: rgba(8,10,16,.55);
+    color: #f2f4f8;
+    border: 1px solid rgba(255,255,255,.28);
     border-radius: 12px;
     padding: 12px 16px;
-    box-shadow: inset 0 1px rgba(255,255,255,.1);
+    box-shadow: inset 0 1px rgba(255,255,255,.08);
 }
-#input-field:focus { border-color: #d8b4ff; }
+#input-field:focus { border-color: #8fa8ff; }
 #unlock-button {
-    background: linear-gradient(#a15ce8,#7734cd);
-    color: white;
-    border: 1px solid rgba(255,255,255,.2);
+    background: linear-gradient(#8fa8ff,#5b7be8);
+    color: #ffffff;
+    border: 1px solid rgba(255,255,255,.25);
     border-radius: 12px;
     padding: 10px 24px;
     margin-top: 14px;
     text-shadow: none;
 }
-#unlock-button:hover { background: #ae6ff1; }
-#error-label, #warning-label { color: #ffb4d0; }
+#unlock-button:hover { background: #a3b8ff; }
+#error-label, #warning-label { color: #ffb4c2; }

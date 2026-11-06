@@ -1,6 +1,7 @@
 #include "workspace.h"
 #include "backend.h"
 #include "settingsservice.h"
+#include "sovelmode.h"
 #include <QFile>
 #include <QFileInfo>
 #include <QDir>
@@ -48,10 +49,15 @@ QString read(const QString &name){QFile f(name);return f.open(QIODevice::ReadOnl
 void dbus(QObject *owner,const QString &service,const QString &path,const QString &interface,const QString &method,const QVariantList &args,std::function<void(const QDBusMessage&)> done){auto m=QDBusMessage::createMethodCall(service,path,interface,method);m.setArguments(args);auto w=new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(m,3000),owner);QObject::connect(w,&QDBusPendingCallWatcher::finished,owner,[w,done]{done(w->reply());w->deleteLater();});}
 }
 Workspace::Workspace(Backend *backend,SettingsService *settings,bool desktop,QObject *parent):QObject(parent),m_backend(backend),m_settings(settings),m_desktop(desktop),m_network(this){
- QFile catalog(":/assets/widget-catalog.json");if(catalog.open(QIODevice::ReadOnly))m_registry=QJsonDocument::fromJson(catalog.readAll()).array().toVariantList();
+ QFile catalog(":/assets/widget-catalog.json");
+ if(catalog.open(QIODevice::ReadOnly))for(const auto &entry:QJsonDocument::fromJson(catalog.readAll()).array().toVariantList()){
+  // Private widget types (JARED, projects, AI monitor) do not exist in Normal Mode.
+  const auto modes=entry.toMap().value("modes").toStringList();if(modes.isEmpty()||modes.contains(SovelMode::name()))m_registry<<entry;}
  m_file=QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)+"/Sovel/Workspace.json";reload();
  if(!QFile::exists(m_file)){
-  auto legacy=backend->widgets();if(legacy.isEmpty())legacy={QVariantMap{{"type","clock"},{"x",.98},{"y",.12}},QVariantMap{{"type","jared"},{"x",.98},{"y",.40}},QVariantMap{{"type","system"},{"x",.98},{"y",.74}}};
+  const auto middle=SovelMode::isPrivate()?QVariantMap{{"type","jared"},{"x",.98},{"y",.40}}:QVariantMap{{"type","calendar"},{"x",.98},{"y",.40}};
+  auto legacy=backend->widgets();if(legacy.isEmpty())legacy={QVariantMap{{"type","clock"},{"x",.98},{"y",.12}},middle,QVariantMap{{"type","system"},{"x",.98},{"y",.74}}};
+  if(!SovelMode::isPrivate())legacy.erase(std::remove_if(legacy.begin(),legacy.end(),[this](const QVariant &w){return !knownType(w.toMap().value("type").toString());}),legacy.end());
   m_extra["legacyLayout"]=legacy;m_dirty.insert("legacyLayout");
   for(int i=0;i<legacy.size();i++){auto widget=legacy[i].toMap();widget["size"]=widget.value("type")=="system"?"medium":"small";widget["x"]=i%2?.02:.98;widget["y"]=i<2?.10:.68;legacy[i]=widget;}
   saveLayout(legacy);
@@ -75,6 +81,7 @@ QString Workspace::assistantStatePath()
 }
 void Workspace::readAssistantState()
 {
+ if(!SovelMode::isPrivate())return;
  auto state=jsonFile(assistantStatePath());
 #ifdef Q_OS_LINUX
  const auto pid=state.value("pid").toLongLong();
@@ -85,7 +92,7 @@ void Workspace::readAssistantState()
 void Workspace::assistantCommand(const QString &action,const QString &text)
 {
  static const QStringList allowed{"connect","ask","voice-start","voice-stop","clear-transcript","approve","reject","choose-output","cancel","show","preferences","unload","load-workspaces","project-summary","project-task","project-open-file"};
- if(!m_desktop||!allowed.contains(action)||text.size()>2000)return;
+ if(!m_desktop||!SovelMode::isPrivate()||!allowed.contains(action)||text.size()>2000)return;
  const auto endpoint=QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation)+"/sovel-jared.sock";
  auto *socket=new QLocalSocket(this);
  const auto request=QJsonDocument(QJsonObject{{"action",action},{"text",text}}).toJson(QJsonDocument::Compact)+"\n";
@@ -112,7 +119,9 @@ bool Workspace::knownType(const QString &type)const{for(auto w:m_registry)if(w.t
 bool Workspace::hasWidget(const QString &type)const{for(auto w:m_layout)if(w.toMap()["type"]==type)return true;return false;}
 void Workspace::reload(){
  auto values=jsonFile(m_file);if(!m_dirty.contains("usageReset")&&values.value("usageReset")!=m_extra.value("usageReset"))m_dirty.remove("usage");for(auto key:m_dirty)if(m_extra.contains(key))values[key]=m_extra[key];
- if(!m_dirty.contains("layout")){auto layout=values.value("layout").toList();if(layout!=m_layout){m_layout=layout;emit layoutChanged();}}
+ if(!m_dirty.contains("layout")){auto layout=values.value("layout").toList();
+  layout.erase(std::remove_if(layout.begin(),layout.end(),[this](const QVariant &w){return !knownType(w.toMap().value("type").toString());}),layout.end());
+  if(layout!=m_layout){m_layout=layout;emit layoutChanged();}}
  if(!m_dirty.contains("data")){auto data=values.value("data").toMap();if(data!=m_data){m_data=data;emit dataChanged();}}
  if(!m_dirty.contains("usage")){auto usage=values.value("usage").toMap();if(usage!=m_usage){m_usage=usage;emit usageChanged();}}
  if(!m_dirty.contains("weather")){auto weather=values.value("weather").toMap();if(weather!=m_weather){m_weather=weather;emit weatherChanged();}}
@@ -139,6 +148,44 @@ bool Workspace::saveLayout(const QVariantList &list){
   clean<<QVariantMap{{"id",id},{"type",type},{"x",qBound(0.,x,1.)},{"y",qBound(0.,y,1.)},{"size",size},{"opacity",qBound(25,w.value("opacity",75).toInt(),100)},{"refresh",qBound(1,w.value("refresh",type=="weather"?900:2).toInt(),3600)},{"placements",placements}};
  }
  reload();m_layout=clean;m_dirty.insert("layout");const bool ok=save();emit layoutChanged();return ok;
+}
+namespace {
+struct PresetWidget {const char *type;const char *size;double x,y;};
+// Positions are normalized; x/y near 1 anchor to the right/bottom edges.
+const QHash<QString,QList<PresetWidget>> &presets(){
+ static const QHash<QString,QList<PresetWidget>> table{
+  {"command",{{"jared","large",.02,.06},{"projects-deck","medium",.50,.06},{"todo","medium",.98,.06},{"cpu","small",.02,.62},{"gpu","small",.27,.62},{"ram","small",.52,.62},{"downloads","small",.77,.62},{"updates","small",.98,.94}}},
+  {"engineering",{{"system","large",.02,.06},{"gpu","medium",.50,.06},{"notes","large",.98,.06},{"timer","small",.02,.66},{"calculator","medium",.36,.66},{"projects-deck","medium",.98,.94}}},
+  {"research",{{"notes","large",.02,.06},{"todo","medium",.50,.06},{"calendar","medium",.98,.06},{"events","medium",.02,.66},{"world","small",.50,.66},{"projects-deck","medium",.98,.94}}}};
+ return table;
+}
+}
+bool Workspace::applyPreset(const QString &name,const QStringList &outputs,const QString &primary){
+ if(!SovelMode::isPrivate()||!presets().contains(name)||outputs.size()>MaxWidgetOutputs)return false;
+ for(const auto &output:outputs)if(!validOutput(output))return false;
+ QStringList targets;for(const auto &output:outputs)if(output!=primary)targets<<output;
+ reload();
+ // Keep the primary display's own widgets; replace only what lives on secondary displays.
+ QVariantList layout;
+ for(const auto &value:m_layout){const auto widget=value.toMap();const auto placements=widget.value("placements").toMap();bool secondary=false;for(const auto &target:targets)secondary|=placements.contains(target)&&!placements.contains(primary);if(!secondary||targets.isEmpty())layout<<widget;}
+ if(targets.isEmpty())layout.clear();
+ const auto &chosen=presets().value(name);
+ for(int i=0;i<chosen.size();++i){
+  const auto &entry=chosen[i];if(!knownType(entry.type))continue;
+  QVariantMap placements;for(const auto &target:targets)placements[target]=QVariantMap{{"x",entry.x},{"y",entry.y},{"width",0},{"height",0}};
+  // Without the secondary display the same widgets fold into a compact right-hand column.
+  const double column=targets.isEmpty()?entry.x:.98,row=targets.isEmpty()?entry.y:qMin(.96,.08+.11*i);
+  layout<<QVariantMap{{"type",entry.type},{"size",targets.isEmpty()?entry.size:"small"},{"x",column},{"y",row},{"placements",placements}};
+ }
+ m_extra["privatePreset"]=name;m_dirty.insert("privatePreset");
+ const bool ok=saveLayout(layout);
+ m_status=ok?QString("Layout applied. Drag or resize any widget to adjust it."):QString("The layout could not be applied.");emit statusChanged();
+ return ok;
+}
+void Workspace::initializePrivateLayout(const QStringList &outputs,const QString &primary){
+ if(!SovelMode::isPrivate()||outputs.size()<2||!m_desktop)return;
+ reload();if(m_extra.contains("privatePreset"))return;
+ applyPreset("command",outputs,primary);
 }
 QString Workspace::addWidget(const QString &type){if(!knownType(type))return {};reload();const auto id=QUuid::createUuid().toString(QUuid::WithoutBraces);auto list=m_layout;list<<QVariantMap{{"id",id},{"type",type},{"x",.1+(.15*(list.size()%5))},{"y",.12+(.13*(list.size()%4))}};return saveLayout(list)?id:QString();}
 void Workspace::removeWidget(const QString &id){reload();auto list=m_layout;for(int i=0;i<list.size();i++)if(list[i].toMap()["id"]==id){list.removeAt(i);saveLayout(list);m_data.remove(id);m_dirty.insert("data");save();emit dataChanged();return;}}

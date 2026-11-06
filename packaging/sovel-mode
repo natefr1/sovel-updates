@@ -1,0 +1,438 @@
+#!/usr/bin/python3 -I
+"""Sovel dual-environment session control.
+
+Normal Mode and Private Mode are separate Linux accounts on separate virtual
+terminals. This command runs inside either session and performs the
+transitions in a privacy-first order:
+
+  lock          Cover every output with the secure locker and wait until the
+                locker confirms it. Only then quiet JARED, close the Vault and
+                switch to the Normal VT, whose city lock screen is already up.
+  enter-private Lock Normal Mode first, then switch to the private VT.
+  exit-private  Ask every private window to close. If any remain, stop and say
+                so. Otherwise seal the Vault, return to Normal and end the
+                private session so the encrypted home is deactivated.
+
+A failed lock never switches VT and never reports success.
+"""
+import argparse
+import configparser
+import datetime
+import fcntl
+import grp
+import json
+import os
+import re
+import shutil
+import signal
+import socket
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+CONFIG = Path('/etc/sovel/private.conf')
+GROUP = 'sovel-private'
+NAME = re.compile(r'^[a-z_][a-z0-9_-]{0,30}$')
+RUNTIME = Path(os.environ.get('XDG_RUNTIME_DIR') or f'/run/user/{os.getuid()}')
+LOCK_STATE = RUNTIME / 'sovel-lock.state'
+IDLE_PID = RUNTIME / 'sovel-idle.pid'
+WATCH_GUARD = RUNTIME / 'sovel-watch.guard'
+SEAL_GUARD = RUNTIME / 'sovel-seal.guard'
+CONFIG_HOME = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config')) / 'Sovel'
+STATE_HOME = Path(os.environ.get('XDG_STATE_HOME', Path.home() / '.local/state')) / 'Sovel'
+AUDIT = STATE_HOME / 'private-audit.log'
+AUDIT_LIMIT = 256 * 1024
+SEAL_CHOICES = {'never': 0, '5': 5, '15': 15, '30': 30, '60': 60}
+LOCKER = '/usr/bin/sovel-lock'
+SHELL = '/usr/bin/sovel'
+VAULT = '/usr/bin/sovel-vault'
+
+
+def private_mode():
+    """Private Mode is decided by real group membership, never by environment."""
+    try:
+        gid = grp.getgrnam(GROUP).gr_gid
+    except KeyError:
+        return False
+    return gid == os.getgid() or gid in os.getgroups()
+
+
+def config():
+    parser = configparser.ConfigParser(interpolation=None)
+    try:
+        with CONFIG.open(encoding='utf-8') as handle:
+            parser.read_file(handle)
+        section = parser['private']
+        result = {'user': section['user'], 'normal_vt': int(section.get('normal_vt', '7')),
+                  'private_vt': int(section.get('private_vt', '8'))}
+    except (OSError, KeyError, ValueError, configparser.Error):
+        return None
+    if not NAME.match(result['user']) or not all(1 <= result[k] <= 63 for k in ('normal_vt', 'private_vt')):
+        return None
+    if result['normal_vt'] == result['private_vt']:
+        return None
+    return result
+
+
+def preferences():
+    try:
+        path = CONFIG_HOME / 'Preferences.json'
+        if path.stat().st_size > 256 * 1024:
+            return {}
+        value = json.loads(path.read_text(encoding='utf-8'))
+        return value if isinstance(value, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def quiet(args, timeout=5, stdin=None):
+    try:
+        return subprocess.run(args, stdin=subprocess.DEVNULL if stdin is None else stdin,
+                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                              timeout=timeout, text=True)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def notify(summary, body):
+    if shutil.which('notify-send'):
+        quiet(['notify-send', '--app-name=Sovel', '--urgency=normal', summary, body])
+
+
+def audit(event):
+    """Append a content-free event line to the private audit log (Private Mode only)."""
+    if not private_mode():
+        return
+    try:
+        STATE_HOME.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if AUDIT.exists() and AUDIT.stat().st_size > AUDIT_LIMIT:
+            lines = AUDIT.read_text(encoding='utf-8', errors='replace').splitlines()
+            AUDIT.write_text('\n'.join(lines[len(lines) // 2:]) + '\n', encoding='utf-8')
+        descriptor = os.open(AUDIT, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+        with os.fdopen(descriptor, 'a', encoding='utf-8') as handle:
+            stamp = datetime.datetime.now().astimezone().isoformat(timespec='seconds')
+            handle.write(f'{stamp} {event}\n')
+    except OSError:
+        pass
+
+
+def system_bus_call(path, interface, method, signature, values):
+    try:
+        from gi.repository import Gio, GLib
+        bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+        bus.call_sync('org.freedesktop.login1', path, interface, method,
+                      GLib.Variant(signature, values) if signature else None,
+                      None, Gio.DBusCallFlags.NONE, 5000, None)
+        return True
+    except Exception:  # GLib.Error, ImportError: fall back to busctl
+        pass
+    if not shutil.which('busctl'):
+        return False
+    args = ['busctl', 'call', 'org.freedesktop.login1', path, interface, method]
+    if signature:
+        args += [signature.strip('()'), *map(str, values)]
+    result = quiet(args)
+    return bool(result and result.returncode == 0)
+
+
+def switch_vt(number):
+    """Ask logind to change VT; allowed for the active local session by polkit."""
+    return system_bus_call('/org/freedesktop/login1/seat/self', 'org.freedesktop.login1.Seat',
+                           'SwitchTo', '(u)', (number,))
+
+
+def locker_running():
+    result = quiet(['pgrep', '-u', str(os.getuid()), '-x', 'gtklock'])
+    return bool(result and result.returncode == 0)
+
+
+def locked():
+    return LOCK_STATE.exists() and locker_running()
+
+
+def lock_screen():
+    """Return True only when the secure locker confirmed every output is covered."""
+    result = quiet([LOCKER, '--wait'], timeout=15)
+    return bool(result and result.returncode == 0 and locked())
+
+
+def assistant_quiet():
+    """Stop JARED listening/speaking. JARED itself stays running behind the lock."""
+    endpoint = RUNTIME / 'sovel-jared.sock'
+    for action in ('voice-stop', 'cancel'):
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+                connection.settimeout(0.5)
+                connection.connect(str(endpoint))
+                connection.sendall(json.dumps({'action': action, 'text': ''}).encode() + b'\n')
+        except OSError:
+            return
+
+
+def clear_clipboard():
+    if shutil.which('wl-copy'):
+        quiet(['wl-copy', '--clear'])
+        quiet(['wl-copy', '--primary', '--clear'])
+
+
+def vault_lock():
+    """0: Vault closed or absent. 1: still open because files are in use."""
+    if not os.access(VAULT, os.X_OK):
+        return 0
+    result = quiet([VAULT, 'lock'], timeout=15)
+    return 0 if result is None or result.returncode == 0 else 1
+
+
+def close_windows(seconds):
+    """Ask every window to close. Returns how many are still open."""
+    result = quiet([SHELL, '--close-windows', str(seconds)], timeout=seconds + 10)
+    if result is None:
+        return -1
+    try:
+        return int(json.loads(result.stdout or '{}').get('remaining', -1))
+    except (ValueError, AttributeError):
+        return -1
+
+
+def end_session():
+    if os.environ.get('LABWC_PID') and shutil.which('labwc'):
+        result = quiet(['labwc', '--exit'])
+        if result and result.returncode == 0:
+            return True
+    session = os.environ.get('XDG_SESSION_ID')
+    if session and shutil.which('loginctl'):
+        result = quiet(['loginctl', 'terminate-session', session])
+        return bool(result and result.returncode == 0)
+    return False
+
+
+def seal_minutes():
+    value = str(preferences().get('private.sealAfterLock', 'never'))
+    return SEAL_CHOICES.get(value, 0)
+
+
+def spawn(*args):
+    subprocess.Popen([sys.executable, '-I', os.path.abspath(__file__), *args],
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     start_new_session=True, close_fds=True)
+
+
+def command_lock(args):
+    if not private_mode():
+        return 0 if lock_screen() else 1
+    if not lock_screen():
+        audit('lock-failed')
+        notify('Lock failed', 'The private workspace could not be covered. It was not switched away.')
+        return 1
+    assistant_quiet()
+    clear_clipboard()
+    if vault_lock():
+        audit('vault-busy-at-lock')
+    audit('locked')
+    settings = config()
+    if settings and not switch_vt(settings['normal_vt']):
+        audit('switch-failed')
+    minutes = seal_minutes()
+    if minutes and not args.sleep:
+        spawn('seal-when-locked', str(minutes))
+    return 0
+
+
+def command_enter_private(_args):
+    if private_mode():
+        return 0
+    settings = config()
+    if not settings:
+        return 2
+    if not lock_screen():
+        notify('Lock failed', 'This desktop could not be locked, so the private workspace was not opened.')
+        return 1
+    if not switch_vt(settings['private_vt']):
+        notify('Could not switch', 'This desktop stays locked. Unlock it to continue.')
+        return 1
+    return 0
+
+
+def command_exit_private(args):
+    if not private_mode():
+        return 2
+    assistant_quiet()
+    remaining = close_windows(args.timeout)
+    if remaining != 0:
+        audit('exit-blocked')
+        notify('Private workspace is still open',
+               'Some windows did not close. Save or close them, then choose Exit Private Workspace again.'
+               if remaining > 0 else 'Open windows could not be inspected. Nothing was closed.')
+        return 1
+    if vault_lock():
+        audit('exit-blocked-vault')
+        notify('Vault is in use', 'Close files from the Vault, then try again.')
+        return 1
+    clear_clipboard()
+    audit('sealed')
+    settings = config()
+    if settings:
+        switch_vt(settings['normal_vt'])
+    return 0 if end_session() else 1
+
+
+def command_seal_when_locked(args):
+    """While the private session stays locked, seal it after the chosen delay."""
+    if not private_mode():
+        return 2
+    RUNTIME.mkdir(parents=True, exist_ok=True)
+    with open(SEAL_GUARD, 'w', encoding='utf-8') as guard:
+        try:
+            fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return 0
+        deadline = time.time() + max(1, args.minutes) * 60
+        while time.time() < deadline:
+            time.sleep(min(15, max(1, deadline - time.time())))
+            if not locked():
+                return 0
+        remaining = close_windows(30)
+        if remaining != 0 or not locked():
+            audit('seal-deferred')
+            return 1
+        if vault_lock():
+            audit('seal-deferred-vault')
+            return 1
+        audit('sealed-after-lock')
+        return 0 if end_session() else 1
+
+
+def command_watch(_args):
+    """Defense in depth: lock whenever the private session stops being the active VT."""
+    if not private_mode():
+        return 2
+    RUNTIME.mkdir(parents=True, exist_ok=True)
+    guard = open(WATCH_GUARD, 'w', encoding='utf-8')
+    try:
+        fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return 0
+    from gi.repository import Gio, GLib
+    bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+    session_id = os.environ.get('XDG_SESSION_ID', '')
+    method = 'GetSession' if session_id else 'GetSessionByPID'
+    value = GLib.Variant('(s)', (session_id,)) if session_id else GLib.Variant('(u)', (os.getpid(),))
+    path = bus.call_sync('org.freedesktop.login1', '/org/freedesktop/login1', 'org.freedesktop.login1.Manager',
+                         method, value, GLib.VariantType('(o)'), Gio.DBusCallFlags.NONE, 5000, None).unpack()[0]
+
+    def changed(_connection, _sender, _path, _interface, _signal, parameters):
+        interface, properties, _invalidated = parameters.unpack()
+        if interface == 'org.freedesktop.login1.Session' and properties.get('Active') is False and not locked():
+            if lock_screen():
+                assistant_quiet()
+                audit('locked-on-vt-change')
+            else:
+                audit('lock-failed-on-vt-change')
+
+    def lock_requested(*_unused):
+        spawn('lock')
+
+    bus.signal_subscribe('org.freedesktop.login1', 'org.freedesktop.DBus.Properties', 'PropertiesChanged',
+                         path, None, Gio.DBusSignalFlags.NONE, changed)
+    bus.signal_subscribe('org.freedesktop.login1', 'org.freedesktop.login1.Session', 'Lock',
+                         path, None, Gio.DBusSignalFlags.NONE, lock_requested)
+    loop = GLib.MainLoop()
+    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, loop.quit)
+    loop.run()
+    return 0
+
+
+def idle_arguments():
+    values = preferences()
+    try:
+        minutes = int(values.get('lock.idleMinutes', 10))
+    except (TypeError, ValueError):
+        minutes = 10
+    minutes = max(0, min(60, minutes))
+    on_sleep = values.get('lock.onSleep', True) is not False
+    if private_mode():
+        # Private Mode always locks before sleep and never goes without an idle lock.
+        minutes = minutes or 5
+        on_sleep = True
+    args = ['swayidle', '-w']
+    if minutes:
+        args += ['timeout', str(minutes * 60), '/usr/bin/sovel-mode lock']
+    if on_sleep:
+        args += ['before-sleep', '/usr/bin/sovel-mode lock --sleep']
+    args += ['lock', '/usr/bin/sovel-mode lock']
+    return args
+
+
+def stop_idle():
+    try:
+        pid = int(IDLE_PID.read_text(encoding='utf-8').strip())
+        if Path(f'/proc/{pid}/comm').read_text(encoding='utf-8').strip() == 'swayidle':
+            os.kill(pid, signal.SIGTERM)
+    except (OSError, ValueError):
+        pass
+    IDLE_PID.unlink(missing_ok=True)
+
+
+def command_idle(_args):
+    if not shutil.which('swayidle'):
+        return 1
+    stop_idle()
+    process = subprocess.Popen(idle_arguments(), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL, start_new_session=True, close_fds=True)
+    IDLE_PID.write_text(str(process.pid), encoding='utf-8')
+    return 0
+
+
+def command_session_start(args):
+    command_idle(args)
+    if private_mode():
+        spawn('watch')
+        audit('session-started')
+    return 0
+
+
+def command_status(_args):
+    settings = config()
+    print(json.dumps({'mode': 'private' if private_mode() else 'normal', 'configured': bool(settings),
+                      'normalVt': settings['normal_vt'] if settings else None,
+                      'privateVt': settings['private_vt'] if settings else None,
+                      'locked': locked(), 'sealAfterLockMinutes': seal_minutes()}))
+    return 0
+
+
+def command_audit(_args):
+    if not private_mode():
+        return 2
+    try:
+        lines = AUDIT.read_text(encoding='utf-8', errors='replace').splitlines()[-200:]
+    except OSError:
+        lines = []
+    print(json.dumps({'events': [dict(zip(('time', 'event'), line.split(' ', 1))) for line in lines if ' ' in line]}))
+    return 0
+
+
+def main():
+    parser = argparse.ArgumentParser(prog='sovel-mode', description='Sovel Normal/Private session control.')
+    commands = parser.add_subparsers(dest='command', required=True)
+    lock = commands.add_parser('lock', help='Lock; from Private, return to the Normal lock screen')
+    lock.add_argument('--sleep', action='store_true', help=argparse.SUPPRESS)
+    commands.add_parser('enter-private', help='Lock Normal Mode and switch to the private workspace')
+    leave = commands.add_parser('exit-private', help='Close private windows and seal the workspace')
+    leave.add_argument('--timeout', type=int, default=20)
+    seal = commands.add_parser('seal-when-locked', help=argparse.SUPPRESS)
+    seal.add_argument('minutes', type=int)
+    commands.add_parser('watch', help=argparse.SUPPRESS)
+    commands.add_parser('idle', help='Restart automatic locking with current preferences')
+    commands.add_parser('session-start', help=argparse.SUPPRESS)
+    commands.add_parser('status')
+    commands.add_parser('audit', help='Private authentication and locking events')
+    args = parser.parse_args()
+    handlers = {'lock': command_lock, 'enter-private': command_enter_private, 'exit-private': command_exit_private,
+                'seal-when-locked': command_seal_when_locked, 'watch': command_watch, 'idle': command_idle,
+                'session-start': command_session_start, 'status': command_status, 'audit': command_audit}
+    return handlers[args.command](args)
+
+
+if __name__ == '__main__':
+    sys.exit(main())

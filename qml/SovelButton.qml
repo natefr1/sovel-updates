@@ -5,6 +5,8 @@ Button {
     readonly property bool themed:typeof SettingsService!=="undefined"&&!!SettingsService
     property bool primary: false
     property string glyph: ""
+    // Used when no SettingsService exists (greeters): violet by default.
+    property color tone: "#7829D4"
     implicitHeight: 40
     implicitWidth: Math.max(40, label.implicitWidth + 30)
     hoverEnabled: true
@@ -20,7 +22,7 @@ Button {
     }
     background: Rectangle {
         radius: 12
-        color: control.themed?(control.primary?SettingsService.colors.accent:control.hovered?SettingsService.colors.surfaceHover:SettingsService.colors.surface):control.primary ? (control.hovered ? "#AE42EE" : "#7829D4") : control.hovered ? "#35CAB6FF" : "#15FFFFFF"
+        color: control.themed?(control.primary?SettingsService.colors.accent:control.hovered?SettingsService.colors.surfaceHover:SettingsService.colors.surface):control.primary ? (control.hovered ? Qt.lighter(control.tone,1.25) : control.tone) : control.hovered ? "#35CAB6FF" : "#15FFFFFF"
         border.color: control.activeFocus ? "#E3D9FC" : "#30C8ABFF"
         border.width: control.activeFocus ? 2 : 1
         Behavior on color { ColorAnimation { duration: System.reducedMotion ? 0 : 160 } }

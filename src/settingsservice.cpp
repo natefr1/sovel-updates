@@ -1,4 +1,5 @@
 #include "settingsservice.h"
+#include "sovelmode.h"
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QFile>
@@ -23,6 +24,17 @@
 
 SettingsService::SettingsService(QObject *parent,bool applyUserChanges):QObject(parent),m_applyUserChanges(applyUserChanges){
  QFile schema(":/assets/settings-pages.json");if(schema.open(QIODevice::ReadOnly)){auto root=QJsonDocument::fromJson(schema.readAll()).object();m_pages=root["pages"].toArray().toVariantList();m_definitions=root["preferences"].toObject().toVariantMap();}
+ // Pages, items and preferences tagged with "modes" exist only in those modes.
+ // Normal Mode never receives private page definitions, even through search.
+ const auto mode=SovelMode::name();
+ const auto allowed=[&mode](const QVariantMap &entry){const auto modes=entry.value("modes").toStringList();return modes.isEmpty()||modes.contains(mode);};
+ QVariantList visible;
+ for(const auto &value:m_pages){auto page=value.toMap();if(!allowed(page))continue;QVariantList sections;
+  for(const auto &sectionValue:page.value("sections").toList()){auto section=sectionValue.toMap();if(!allowed(section))continue;QVariantList items;
+   for(const auto &item:section.value("items").toList()){const auto entry=item.toMap();if(allowed(entry)&&(entry.value("type")!="preference"||allowed(m_definitions.value(entry.value("key").toString()).toMap())))items<<entry;}
+   if(!items.isEmpty()){section["items"]=items;sections<<section;}}
+  page["sections"]=sections;visible<<page;}
+ m_pages=visible;
  m_file=QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)+"/Sovel/Preferences.json";reload();
  m_poll.setInterval(2000);connect(&m_poll,&QTimer::timeout,this,[this]{reload();const int hour=QTime::currentTime().hour();if(hour!=m_themeHour){m_themeHour=hour;if(m_preferences.value("appearance.mode")=="automatic"){updateApplicationTheme();emit changed();if(m_applyUserChanges)applyPreferences();}}});m_poll.start();
 }
@@ -68,9 +80,19 @@ void SettingsService::updateApplicationTheme(){
  auto font=QGuiApplication::font();font.setFamily(m_preferences.value("appearance.font","Noto Sans").toString());font.setPixelSize(m_preferences.value("appearance.textSize",13).toInt());QGuiApplication::setFont(font);
 }
 QVariantMap SettingsService::colors()const{
- const auto mode=m_preferences.value("appearance.mode","dark").toString();const bool light=mode=="light"||(mode=="automatic"&&QTime::currentTime().hour()>=7&&QTime::currentTime().hour()<19);const bool contrast=m_preferences.value("accessibility.highContrast",false).toBool();
- QColor accent(m_preferences.value("appearance.accent","#B58BE8").toString());if(!accent.isValid())accent=QColor("#B58BE8");
- return {{"light",light},{"background",light?"#F3EFF8":"#15101E"},{"sidebar",light?"#E9E0F1":"#22172F"},{"surface",light?"#FCFAFF":"#2B1E3B"},{"surfaceHover",light?"#E8D7F7":"#3E2B50"},{"text",light?"#24182F":"#F5EDFF"},{"muted",light?"#65536E":"#C3B1D3"},{"border",contrast?(light?"#60406F":"#DFCAFA"):(light?"#CFC0DB":"#59406E")},{"accent",accent.name()},{"accentText",accent.lightnessF()>0.62?"#21142D":"#FFFFFF"},{"field",light?"#FFFFFF":"#1C1328"},{"danger",light?"#B32745":"#FFA2B4"},{"success",light?"#25704D":"#9BD8B5"}};
+ const bool isPrivate=SovelMode::isPrivate();
+ // Private Mode is always the dark violet laboratory; Normal Mode is a quiet graphite desktop.
+ const auto mode=isPrivate?QString("dark"):m_preferences.value("appearance.mode","dark").toString();const bool light=mode=="light"||(mode=="automatic"&&QTime::currentTime().hour()>=7&&QTime::currentTime().hour()<19);const bool contrast=m_preferences.value("accessibility.highContrast",false).toBool();
+ const auto schemaAccent=m_definitions.value("appearance.accent").toMap().value("default").toString();
+ auto chosen=m_preferences.value("appearance.accent",schemaAccent).toString();
+ // The untouched schema default means "use this mode's own accent".
+ if(chosen.compare(schemaAccent,Qt::CaseInsensitive)==0)chosen=isPrivate?"#BF40FA":"#7C9CFF";
+ QColor accent(chosen);if(!accent.isValid())accent=QColor(isPrivate?"#BF40FA":"#7C9CFF");
+ QVariantMap palette;
+ if(isPrivate)palette={{"background","#07060B"},{"sidebar","#0E0A15"},{"surface","#151021"},{"surfaceHover","#24183A"},{"text","#F1EBFF"},{"muted","#B3A6CC"},{"border",contrast?"#E3D9FC":"#3A2A55"},{"field","#0B0812"},{"danger","#FF8FA8"},{"success","#7FE0B5"},{"secondary","#4928C2"},{"velvet","#5B2A62"},{"periwinkle","#E3D9FC"}};
+ else palette={{"background",light?"#F4F5F7":"#121317"},{"sidebar",light?"#E9EBEF":"#191B21"},{"surface",light?"#FFFFFF":"#20232A"},{"surfaceHover",light?"#E2E6EE":"#2B2F38"},{"text",light?"#1B1D22":"#EEF0F4"},{"muted",light?"#5D6370":"#A7ADBA"},{"border",contrast?(light?"#3B4050":"#D8DCE6"):(light?"#D3D7DF":"#353944")},{"field",light?"#FFFFFF":"#16181D"},{"danger",light?"#B32745":"#FFA2B4"},{"success",light?"#25704D":"#9BD8B5"},{"secondary",light?"#4D6BD8":"#5B7BE8"},{"velvet",light?"#D9DDE6":"#2A2E38"},{"periwinkle",light?"#30343D":"#E6E9F0"}};
+ palette["light"]=light;palette["private"]=isPrivate;palette["accent"]=accent.name();palette["accentText"]=accent.lightnessF()>0.62?"#14161B":"#FFFFFF";
+ return palette;
 }
 bool SettingsService::pageExists(const QString &id)const{for(auto p:m_pages)if(p.toMap()["id"].toString()==id)return true;return false;}
 QUrl SettingsService::avatarUrl()const{const auto folder=QFileInfo(m_file).absolutePath()+"/avatars/";const auto name=m_extra.value("avatar").toString();return name.startsWith(folder)&&QFileInfo(name).isFile()?QUrl::fromLocalFile(name):QUrl();}

@@ -182,6 +182,11 @@
               "capability": ""
             },
             {
+              "type": "info",
+              "label": "One lock screen everywhere",
+              "detail": "Every lock shows the same city lock screen with the time and date. It never shows which apps, projects or workspaces were open."
+            },
+            {
               "type": "link",
               "label": "Lock screen appearance",
               "target": "lockscreen",
@@ -199,10 +204,20 @@
           "title": "Automatic locking",
           "items": [
             {
-              "type": "support",
-              "label": "Idle locking",
-              "capability": "idle-lock",
-              "detail": "Automatic locking needs an integrated idle service. The secure Lock Now action remains available."
+              "type": "preference",
+              "key": "lock.idleMinutes"
+            },
+            {
+              "type": "preference",
+              "key": "lock.onSleep"
+            },
+            {
+              "type": "info",
+              "label": "Private Mode always locks",
+              "detail": "The private workspace locks after at most a few idle minutes, before every sleep and when the lid closes, and always returns to this city lock screen.",
+              "modes": [
+                "private"
+              ]
             }
           ]
         },
@@ -211,8 +226,8 @@
           "items": [
             {
               "type": "info",
-              "label": "Greeter preserved",
-              "detail": "This update does not replace or reconfigure the login screen."
+              "label": "City sign-in",
+              "detail": "The sign-in screen uses the same city design as the lock screen and never lists accounts."
             },
             {
               "type": "link",
@@ -360,7 +375,10 @@
             },
             {
               "type": "preference",
-              "key": "bar.show.jared"
+              "key": "bar.show.jared",
+              "modes": [
+                "private"
+              ]
             },
             {
               "type": "preference",
@@ -1052,7 +1070,7 @@
           "items": [
             {
               "type": "link",
-              "label": "Encryption status",
+              "label": "Encryption and privacy status",
               "target": "privacy",
               "detail": ""
             },
@@ -1439,6 +1457,20 @@
       "description": "Understand the protections actually available.",
       "sections": [
         {
+          "title": "Private workspace",
+          "modes": [
+            "private"
+          ],
+          "items": [
+            {
+              "type": "link",
+              "label": "Encryption, sealing and Vault",
+              "target": "private",
+              "detail": "AES-256-XTS private storage, lock and seal policy, isolation check"
+            }
+          ]
+        },
+        {
           "title": "Protection",
           "items": [
             {
@@ -1498,13 +1530,139 @@
               "type": "link",
               "label": "JARED permissions and history",
               "target": "jared",
-              "detail": ""
+              "detail": "",
+              "modes": [
+                "private"
+              ]
             },
             {
               "type": "link",
               "label": "Personal usage data",
               "target": "screentime",
               "detail": ""
+            }
+          ]
+        }
+      ],
+      "legacy": -1
+    },
+    {
+      "id": "private",
+      "name": "Private Workspace",
+      "group": "Privacy",
+      "icon": "privacy",
+      "modes": [
+        "private"
+      ],
+      "description": "Your separate, encrypted laboratory account.",
+      "sections": [
+        {
+          "title": "Protection",
+          "items": [
+            {
+              "type": "info",
+              "label": "Separate encrypted account",
+              "detail": "Private Mode is its own Linux account. Its home is a LUKS2 image encrypted with AES-256-XTS, unlocked only by its own password and sealed again when you exit. Normal Mode cannot read it, search it or see its windows."
+            },
+            {
+              "type": "action",
+              "label": "Run isolation check",
+              "operation": "isolation-check",
+              "detail": "Checks encryption, swap, hibernation, crash dumps, remote login and Normal account privileges.",
+              "capability": ""
+            }
+          ]
+        },
+        {
+          "title": "Locking & sealing",
+          "items": [
+            {
+              "type": "info",
+              "label": "Lock returns to the city",
+              "detail": "Locking covers every display first, quiets JARED, closes the Vault and returns to the ordinary city lock screen. Unlocking it opens Normal Mode, never this workspace."
+            },
+            {
+              "type": "preference",
+              "key": "private.sealAfterLock"
+            },
+            {
+              "type": "info",
+              "label": "What sealing does",
+              "detail": "Sealing asks every private window to close and ends this session so the encrypted home is locked and its key leaves memory. Apps that ask to save keep the workspace open and locked. Terminals and apps that do not ask can lose running work."
+            },
+            {
+              "type": "action",
+              "label": "Lock computer",
+              "operation": "lock",
+              "detail": "",
+              "capability": ""
+            },
+            {
+              "type": "action",
+              "label": "Exit private workspace",
+              "operation": "exit-private",
+              "detail": "Closes private windows, seals the Vault and the encrypted home, and returns to Normal Mode.",
+              "capability": ""
+            }
+          ]
+        },
+        {
+          "title": "Vault",
+          "items": [
+            {
+              "type": "action",
+              "label": "Open Vault",
+              "operation": "vault",
+              "detail": "A second encrypted folder (AES-256-GCM) with its own passphrase. It closes when idle and whenever Sovel locks.",
+              "capability": ""
+            }
+          ]
+        },
+        {
+          "title": "Command center",
+          "items": [
+            {
+              "type": "info",
+              "label": "Secondary display",
+              "detail": "Applies a widget layout to your secondary displays. Every widget stays movable and resizable, and the layout collapses onto the primary display when a monitor is disconnected."
+            },
+            {
+              "type": "action",
+              "label": "Command Center layout",
+              "operation": "preset-command",
+              "detail": "JARED, projects, tasks and live system monitoring",
+              "capability": ""
+            },
+            {
+              "type": "action",
+              "label": "Engineering layout",
+              "operation": "preset-engineering",
+              "detail": "System and GPU monitoring, notes, timers and calculations",
+              "capability": ""
+            },
+            {
+              "type": "action",
+              "label": "Research layout",
+              "operation": "preset-research",
+              "detail": "Notes, tasks, calendar, events and world clocks",
+              "capability": ""
+            }
+          ]
+        },
+        {
+          "title": "Records & recovery",
+          "items": [
+            {
+              "type": "action",
+              "label": "View private audit log",
+              "operation": "private-audit",
+              "detail": "Unlock, lock and seal events only. No file names, window titles or conversations.",
+              "capability": ""
+            },
+            {
+              "type": "info",
+              "label": "Recovery key and encrypted backups",
+              "detail": "The recovery key shown during setup unlocks this account if the password is lost. With the workspace exited, run \"sudo sovel-private backup /path/to/drive\" from Normal Mode to copy the still-encrypted image."
             }
           ]
         }
@@ -1565,7 +1723,10 @@
           ]
         }
       ],
-      "legacy": -1
+      "legacy": -1,
+      "modes": [
+        "private"
+      ]
     },
     {
       "id": "backup",
@@ -1951,7 +2112,10 @@
     "bar.show.jared": {
       "label": "JARED",
       "kind": "switch",
-      "default": true
+      "default": true,
+      "modes": [
+        "private"
+      ]
     },
     "bar.show.calendar": {
       "label": "Date & time",
@@ -2142,13 +2306,19 @@
       "kind": "switch",
       "default": false,
       "alias": "jared/allowBasic",
-      "sensitive": true
+      "sensitive": true,
+      "modes": [
+        "private"
+      ]
     },
     "jared.speak": {
       "label": "Read replies aloud",
       "kind": "switch",
       "default": false,
-      "alias": "jared/speak"
+      "alias": "jared/speak",
+      "modes": [
+        "private"
+      ]
     },
     "jared.idle": {
       "label": "Unload idle model after",
@@ -2168,7 +2338,10 @@
         "5 minutes",
         "10 minutes"
       ],
-      "alias": "jared/idle"
+      "alias": "jared/idle",
+      "modes": [
+        "private"
+      ]
     },
     "bar.order": {
       "label": "Status icon order",
@@ -2190,6 +2363,48 @@
       "label": "Hide personal widget content",
       "kind": "switch",
       "default": false
+    },
+    "lock.idleMinutes": {
+      "label": "Lock after inactivity",
+      "kind": "slider",
+      "default": 10,
+      "minimum": 0,
+      "maximum": 60,
+      "step": 1,
+      "unit": " min",
+      "capability": "idle-lock",
+      "detail": "0 turns automatic locking off in Normal Mode."
+    },
+    "lock.onSleep": {
+      "label": "Lock before sleep and when the lid closes",
+      "kind": "switch",
+      "default": true,
+      "capability": "idle-lock",
+      "modes": [
+        "normal"
+      ]
+    },
+    "private.sealAfterLock": {
+      "label": "Seal the workspace while locked",
+      "kind": "choice",
+      "default": "never",
+      "choices": [
+        "never",
+        "5",
+        "15",
+        "30",
+        "60"
+      ],
+      "labels": [
+        "Never",
+        "After 5 minutes",
+        "After 15 minutes",
+        "After 30 minutes",
+        "After 1 hour"
+      ],
+      "modes": [
+        "private"
+      ]
     }
   }
 }

@@ -21,6 +21,9 @@ public:
     Q_INVOKABLE void activate(int id);
     Q_INVOKABLE bool activateApp(const QStringList &appIds,bool toggleActive=false);
     Q_INVOKABLE void closeActive();
+    // Ask every toplevel to close, as its own close button would. Returns how many were asked.
+    int closeAll();
+    int count() const;
     Q_INVOKABLE void minimizeActive();
     Q_INVOKABLE void toggleMaximized();
 signals:

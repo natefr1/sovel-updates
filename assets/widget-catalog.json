@@ -249,6 +249,9 @@
       "small",
       "medium",
       "large"
+    ],
+    "modes": [
+      "private"
     ]
   },
   {
@@ -257,7 +260,14 @@
     "group": "Productivity",
     "icon": "files",
     "network": false,
-    "sizes": ["small", "medium", "large"]
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ],
+    "modes": [
+      "private"
+    ]
   },
   {
     "type": "ai-monitor",
@@ -265,7 +275,14 @@
     "group": "System",
     "icon": "system",
     "network": false,
-    "sizes": ["small", "medium", "large"]
+    "sizes": [
+      "small",
+      "medium",
+      "large"
+    ],
+    "modes": [
+      "private"
+    ]
   },
   {
     "type": "downloads",

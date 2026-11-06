@@ -38,6 +38,17 @@ Item {
         if(layoutModel.count>saved.length)layoutModel.remove(saved.length,layoutModel.count-saved.length);
     }
     Connections {target:Workspace;function onLayoutChanged(){root.syncWidgets()}}
+    // Private Mode: the first time two displays are present, the secondary one
+    // becomes the command center. Every widget stays movable afterwards.
+    property bool privateLayoutChecked:false
+    function checkPrivateLayout(){
+        if(privateLayoutChecked||!desktopMode||!System.privateMode||surfaceKind!=="background"||!root.primaryOutput||typeof Displays==="undefined"||!Displays)return
+        const outputs=Displays.outputs.filter(o=>o.enabled!==false).map(o=>o.name)
+        if(outputs.length<2)return
+        privateLayoutChecked=true
+        Workspace.initializePrivateLayout(outputs,Displays.primary)
+    }
+    Connections {target:typeof Displays!=="undefined"?Displays:null;function onChanged(){root.checkPrivateLayout()}}
     ListModel {id:layoutModel}
     Wallpaper { anchors.fill: parent; visible: root.background&&(!!root.displayWallpaper||!System.externalWallpaper); image: root.displayWallpaper?"file://"+root.displayWallpaper.split("/").map(encodeURIComponent).join("/"):System.wallpaperUrl }
     MouseArea { anchors.fill: parent; visible: root.background; acceptedButtons: Qt.RightButton; onClicked: root.editing=!root.editing }

@@ -6,8 +6,10 @@ Item {
     readonly property bool canAnimate: motionAllowed && !System.reducedMotion && !System.lowEffects && visible
     property url image: "qrc:/assets/landscape.png"
     Image { anchors.fill: parent; source: root.image; fillMode: Image.PreserveAspectCrop }
+    // The drifting violet aurora belongs to the legacy landscape/room art, not the city or emblem.
+    readonly property bool aurora: /landscape|lockroom/.test(String(root.image))
     Rectangle {
-        id: aurora; x: parent.width*0.52; y: -parent.height*0.18
+        id: aurora; visible: root.aurora; x: parent.width*0.52; y: -parent.height*0.18
         width: parent.width*0.6; height: parent.height*0.75
         radius: height/2; rotation: -28; opacity: 0.13
         gradient: Gradient {

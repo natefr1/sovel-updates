@@ -28,6 +28,16 @@ case "${1:-}" in
   *) echo 'Usage: sovel-session [--software]' >&2; exit 2 ;;
 esac
 test "$#" -eq 0 || { echo 'Usage: sovel-session [--software]' >&2; exit 2; }
+# Private Mode is real group membership, decided by the account, not by a setting.
+if id -nG | tr ' ' '\n' | grep -qx 'sovel-private'; then
+  export SOVEL_MODE=private
+  umask 077
+  # Ctrl+Alt+Fn would change VT without locking. Private leaves only through
+  # sovel-mode, which confirms the lock first.
+  export XKB_DEFAULT_OPTIONS="${XKB_DEFAULT_OPTIONS:+$XKB_DEFAULT_OPTIONS,}srvrkeys:none"
+else
+  export SOVEL_MODE=normal
+fi
 export XDG_SESSION_TYPE=wayland
 export XDG_CURRENT_DESKTOP=Sovel
 export XDG_SESSION_DESKTOP=sovel

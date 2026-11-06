@@ -3,7 +3,11 @@ set -eu
 dbus-update-activation-environment --systemd DISPLAY XAUTHORITY WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE 2>/dev/null || true
 # Keep agents scoped to this graphical session and avoid duplicate instances.
 agent_pids=""
-cleanup(){ for agent_pid in $agent_pids; do kill "$agent_pid" 2>/dev/null || true; done; }
+cleanup(){
+    for agent_pid in $agent_pids; do kill "$agent_pid" 2>/dev/null || true; done
+    idle_pid=$(cat "${XDG_RUNTIME_DIR:-/nonexistent}/sovel-idle.pid" 2>/dev/null || true)
+    case "$idle_pid" in ''|*[!0-9]*) ;; *) kill "$idle_pid" 2>/dev/null || true ;; esac
+}
 trap cleanup EXIT
 trap 'exit 0' HUP INT TERM
 start_agent(){
@@ -29,6 +33,8 @@ printf '{}' | /usr/libexec/sovel-settings-helper apply-preferences >/dev/null 2>
 /usr/libexec/sovel-default-handlers >/dev/null 2>&1 || true
 /usr/bin/sovel --desktop &
 shell_pid=$!
+# Idle, sleep and lid locking; in Private Mode also the VT-change watcher.
+/usr/bin/sovel-mode session-start >/dev/null 2>&1 || true
 printf '{}' | /usr/libexec/sovel-settings-helper run-startup >/dev/null 2>&1 || true
 # A freshly booted USB goes straight into the full setup assistant.
 if test -f /etc/sovel/live-image; then /usr/bin/sovel-setup >/tmp/sovel-setup.log 2>&1 & fi

@@ -36,6 +36,9 @@ Canvas {
   else if(symbol==="accessibility"){circle(12,4,2);line([3,9,21,9]);line([12,6,12,14,7,22]);line([12,14,17,22])}
   else if(symbol==="sharing"){circle(5,12,3);circle(19,5,3);circle(19,19,3);line([8,10,16,6]);line([8,14,16,18])}
   else if(symbol==="gaming"){line([6,6,18,6,22,18,19,21,15,16,9,16,5,21,2,18,6,6]);line([7,9,7,14]);line([5,12,10,12]);circle(17,11,1)}
+  else if(symbol==="lock"){c.strokeRect(5,11,14,10);c.beginPath();c.arc(12,11,4.5,Math.PI,0);c.stroke();line([12,15,12,17])}
+  else if(symbol==="vault"){c.strokeRect(3,4,18,16);circle(12,12,4.5);line([12,7.5,12,9]);line([12,15,12,16.5]);line([7.5,12,9,12]);line([15,12,16.5,12]);line([6,20,6,22]);line([18,20,18,22])}
+  else if(symbol==="exit"){line([10,4,4,4,4,20,10,20]);line([9,12,21,12]);line([17,8,21,12,17,16])}
   else {circle(12,12,8);circle(12,12,3)}
  }
 }

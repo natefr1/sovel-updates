@@ -34,3 +34,17 @@ Run `sh tools/verify.sh` and inspect the test output on the target. Before
 retiring GNOME, complete all target session/login/locking checks described in
 README.md. The finished design is intentionally more ambitious than this
 first engineering source package.
+
+## 0.1.0-10 Dual Environment (container checks, 2026-11-06)
+
+Run in a cloud container (Ubuntu 24.04, Qt 6.4.2, no display server):
+
+- `python3 tests/dual-environment.py`: 18 cases, 17 passed, 1 skipped (the non-root check skips when run as root).
+- `tests/mode.cpp`, `tests/settings.cpp` and `tests/workspace.cpp` built and passed against Qt 6.4 with the 6.8 version gate relaxed.
+- `main.cpp`, `windows.cpp` and `auth.cpp` compiled with a PackageKit stub (PackageKit-Qt6 is not packaged for 24.04). `shaders/glass.frag` baked with `qsb`.
+- Greeter (Normal and Private) and Vault rendered offscreen with the real Backend, Auth and SettingsService, with no QML errors. All changed QML parses with `qmlformat`.
+- `shellcheck` on the session scripts reports only existing informational notes.
+
+Not verified here: live greetd/PAM on two VTs, systemd-homed, logind VT switching,
+gtklock on real outputs, swayidle, gocryptfs and labwc. See the checklist in
+`docs/DUAL-ENVIRONMENT.md`.

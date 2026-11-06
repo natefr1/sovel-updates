@@ -22,6 +22,9 @@
 #include <QQuickView>
 #include <QQuickItem>
 #include "settingsservice.h"
+#include "sovelmode.h"
+#include <QCoreApplication>
+#include <cstdio>
 #include "workspace.h"
 #include <QScreen>
 #include <QTimer>
@@ -35,17 +38,41 @@
 #include <QFileInfo>
 #include <QLockFile>
 #include <QThread>
+#include <QElapsedTimer>
 #ifdef SOVEL_LAYER_SHELL
 #include <LayerShellQt/Shell>
 #include <LayerShellQt/Window>
 #endif
 
+// Used by sovel-mode before exiting or sealing the private workspace. Windows
+// that do not close (for example, an editor asking to save) are left open.
+static int closeAllWindows(int argc,char **argv,int seconds){
+    QCoreApplication app(argc,argv);
+    Windows windows(nullptr,false);
+    QTimer::singleShot(250,&app,[&]{windows.closeAll();});
+    QElapsedTimer elapsed;elapsed.start();
+    QTimer poll;poll.setInterval(200);
+    QObject::connect(&poll,&QTimer::timeout,&app,[&]{
+        if(elapsed.elapsed()>500&&windows.count()==0)app.exit(0);
+        else if(elapsed.elapsed()>qint64(seconds)*1000)app.exit(3);
+    });
+    poll.start();
+    const int result=app.exec();
+    std::printf("{\"remaining\":%d}\n",windows.count());std::fflush(stdout);
+    return result;
+}
+
 int main(int argc,char **argv){
-    bool desktop=false,releaseInput=false,downloads=false,jaredService=false;QString mode="preview",capture,settingsPage,packageFile,folderPath,jaredPrompt,previewFile,displayOutput;
+    for(int i=1;i+1<argc;i++)if(QString(argv[i])=="--close-windows"){
+        bool valid=false;const int seconds=QString(argv[i+1]).toInt(&valid);
+        return closeAllWindows(argc,argv,valid?qBound(1,seconds,120):20);
+    }
+    bool desktop=false,releaseInput=false,downloads=false,jaredService=false,privateGreeter=false;QString mode="preview",capture,settingsPage,packageFile,folderPath,jaredPrompt,previewFile,displayOutput;
     for(int i=1;i<argc;i++){
         const QString arg=argv[i];
         if(arg=="--desktop"){desktop=true;mode="desktop";}
         else if(arg=="--greeter")mode="greeter";
+        else if(arg=="--private")privateGreeter=true;
         else if(arg=="--release-shell-input")releaseInput=true;
         else if(arg=="--app" && i+1<argc)mode=argv[++i];
         else if(arg=="--jared-prompt" && i+1<argc)jaredPrompt=argv[++i];
@@ -57,6 +84,12 @@ int main(int argc,char **argv){
         else if(arg=="--preview-file"&&i+1<argc){mode="file-preview";previewFile=argv[++i];}
         else if(arg=="--display-output"&&i+1<argc)displayOutput=argv[++i];
         else if(arg=="--open-folder"){mode="files";if(i+1<argc&&!QString(argv[i+1]).startsWith("--"))folderPath=argv[++i];}
+    }
+    // JARED and the Vault exist only in the private account. This is checked
+    // against real group membership, so no flag or variable can bypass it.
+    if((mode=="jared"||jaredService||mode=="vault")&&!SovelMode::isPrivate()){
+        std::fprintf(stderr,"Sovel: this app is available only in the private workspace.\n");
+        return 3;
     }
 #ifndef SOVEL_LAYER_SHELL
     if(desktop){qFatal("This build has no layer-shell support. Use --preview, or rebuild with SOVEL_LAYER_SHELL=ON.");}
@@ -121,7 +154,7 @@ int main(int argc,char **argv){
         QObject::connect(&app,&QGuiApplication::screenRemoved,jared.get(),&Jared::changed);
     }
     if(mode=="jared")app.setQuitOnLastWindowClosed(false);
-    if(!desktop&&capture.isEmpty()&&folderPath.isEmpty()&&(mode=="files"||mode=="settings"||mode=="library"||mode=="store")&&windows.activateApp({"sovel-"+mode},false))return 0;
+    if(!desktop&&capture.isEmpty()&&folderPath.isEmpty()&&(mode=="files"||mode=="settings"||mode=="library"||mode=="store"||mode=="vault")&&windows.activateApp({"sovel-"+mode},false))return 0;
     std::unique_ptr<FileBrowser> browser;if(mode=="files"){browser=std::make_unique<FileBrowser>();if(downloads)browser->navigate(browser->downloadsPath());else if(!folderPath.isEmpty())browser->navigate(folderPath);}
     PackageInstaller packages;if(!packageFile.isEmpty())packages.load(packageFile);
     if(mode=="motion"||mode=="wallpapers"){
@@ -201,8 +234,8 @@ int main(int argc,char **argv){
         auto view=std::make_unique<QQuickView>();
         view->setScreen(screen);view->setColor(Qt::transparent);
         if(mode=="file-preview"&&screen)view->setPosition(screen->geometry().topLeft());
-        view->setTitle(mode=="settings"?"Settings":mode=="files"?"Files":mode=="library"?"App Library":mode=="store"?"Store":mode=="jared"?"JARED":"Sovel");view->setResizeMode(QQuickView::SizeRootObjectToView);
-        const bool nativeApp=mode=="files" || mode=="settings" || mode=="library" || mode=="store" || mode=="package" || mode=="jared" || mode=="file-preview";
+        view->setTitle(mode=="settings"?"Settings":mode=="files"?"Files":mode=="library"?"App Library":mode=="store"?"Store":mode=="jared"?"JARED":mode=="vault"?"Vault":"Sovel");view->setResizeMode(QQuickView::SizeRootObjectToView);
+        const bool nativeApp=mode=="files" || mode=="settings" || mode=="library" || mode=="store" || mode=="package" || mode=="jared" || mode=="file-preview" || mode=="vault";
         if(mode=="package")view->setTitle("Package Installer");
         if(mode=="file-preview")view->setTitle(QFileInfo(previewFile).fileName()+" — Preview");
         if(mode=="greeter" || nativeApp)view->setFlags(Qt::Window | Qt::FramelessWindowHint);
@@ -221,6 +254,8 @@ int main(int argc,char **argv){
         view->rootContext()->setContextProperty("initialSettingsPage",settingsPage);
         if(mode=="jared")view->rootContext()->setContextProperty("initialJaredPage",jaredPrompt.isEmpty()?"overview":"chat");
         view->rootContext()->setContextProperty("Auth",&auth);
+        view->rootContext()->setContextProperty("greeterPrivate",mode=="greeter"&&privateGreeter);
+        view->rootContext()->setContextProperty("privateAccount",mode=="greeter"?SovelMode::privateUser():QString());
         view->rootContext()->setContextProperty("Windows",&windows);
         view->rootContext()->setContextProperty("StoreService",&store);
         view->engine()->addImageProvider("apps",new AppIcons);
@@ -253,7 +288,7 @@ int main(int argc,char **argv){
         }
 #endif
         if(nativeApp){
-            view->setMinimumSize(QSize(mode=="jared"?520:640,480));
+            view->setMinimumSize(QSize(mode=="jared"||mode=="vault"?520:640,mode=="vault"?420:480));
             if(mode=="jared")QObject::connect(view.get(),&QWindow::visibilityChanged,&app,[&](QWindow::Visibility visibility){if(visibility==QWindow::Hidden&&!jaredService&&!jared->keepBackground())QTimer::singleShot(0,&app,&QCoreApplication::quit);});
             if(browser){
                 auto *window=view.get();
@@ -332,7 +367,7 @@ int main(int argc,char **argv){
             views.erase(std::remove_if(views.begin(),views.end(),[&](const auto &view){return removed.contains(view.get());}),views.end());
         });
     }else{
-        QString file=mode=="greeter"?"Greeter.qml":mode=="files"?"Files.qml":mode=="settings"?"Settings.qml":mode=="library"?"AppLibrary.qml":mode=="store"?"Store.qml":mode=="package"?"PackageInstaller.qml":mode=="jared"?"JaredPanel.qml":mode=="file-preview"?"StandalonePreview.qml":"Desktop.qml";
+        QString file=mode=="greeter"?"Greeter.qml":mode=="vault"?"Vault.qml":mode=="files"?"Files.qml":mode=="settings"?"Settings.qml":mode=="library"?"AppLibrary.qml":mode=="store"?"Store.qml":mode=="package"?"PackageInstaller.qml":mode=="jared"?"JaredPanel.qml":mode=="file-preview"?"StandalonePreview.qml":"Desktop.qml";
         auto *screen=app.primaryScreen();
         if(mode=="file-preview")for(auto *candidate:app.screens())if(candidate->name()==displayOutput){screen=candidate;break;}
         create(file,screen,"preview");

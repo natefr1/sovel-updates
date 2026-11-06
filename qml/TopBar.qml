@@ -8,7 +8,25 @@ Item {
     ShellGlass { anchors.fill: parent; radius: 0; tint: Number(root.preferences["bar.opacity"]||75)/100 }
     TapHandler {acceptedButtons:Qt.RightButton;onTapped:barContext.popup()}
     ShellMenu {id:barContext;ShellMenuItem {text:"Settings";onTriggered:System.launch("settings")} ShellMenuItem {text:"App Library";onTriggered:System.launch("library")}}
-    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: "#35EBD5FF" }
+    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: System.privateMode ? "#40BF40FA" : "#1FFFFFFF" }
+    // Private Mode: discreet JARED status and active task, centred like an instrument readout.
+    Rectangle {
+        id: missionStatus
+        visible: System.privateMode && root.width >= 980
+        readonly property string stateName: root.assistant.state || "offline"
+        readonly property bool live: ["listening","speaking","thinking","executing"].includes(stateName)
+        anchors.centerIn: parent; height: 22; radius: 11
+        width: Math.min(420, missionRow.implicitWidth + 26)
+        color: "#66000000"; border.width: 1; border.color: live ? "#8C5ACFE7" : "#3DB98BFF"
+        Row { id: missionRow; anchors.centerIn: parent; spacing: 8
+            Rectangle { width: 6; height: 6; radius: 3; anchors.verticalCenter: parent.verticalCenter
+                color: missionStatus.stateName==="error"?"#FA786D":missionStatus.stateName==="approval"?"#E9B957":missionStatus.live?"#5ACFE7":missionStatus.stateName==="offline"?"#6E6385":"#BF40FA" }
+            Text { text: "JARED"; color: "#E3D9FC"; font.pixelSize: 10; font.letterSpacing: 2; font.weight: Font.DemiBold; anchors.verticalCenter: parent.verticalCenter }
+            Text { text: missionStatus.stateName.toUpperCase(); color: missionStatus.live ? "#5ACFE7" : "#B3A6CC"; font.pixelSize: 10; font.letterSpacing: 1.5; font.family: "monospace"; anchors.verticalCenter: parent.verticalCenter }
+            Text { width: Math.min(220, implicitWidth); elide: Text.ElideRight; visible: !!text; text: root.assistant.task || root.assistant.status || ""; color: "#B3A6CC"; font.pixelSize: 10; anchors.verticalCenter: parent.verticalCenter }
+        }
+        TapHandler { onTapped: Workspace.assistantCommand("show","") }
+    }
     component BarButton: ToolButton {
         height: 30; padding: 10; topPadding: 0; bottomPadding: 0
         contentItem: Text { text: parent.text; color: SettingsService.colors.text; font.pixelSize: 12; verticalAlignment: Text.AlignVCenter }
@@ -27,8 +45,10 @@ Item {
                 ShellMenuItem { text: Updates.packages.length?"Software Update… ("+Updates.packages.length+")":"Software Update…"; onTriggered: System.launch("updates") }
                 ShellMenuItem { text: "App Library…"; onTriggered: System.launch("library") }
                 ShellMenuItem { text: "Store…"; onTriggered: System.launch("store") }
+                ShellMenuItem { text: "Vault…"; visible: System.privateMode; onTriggered: System.launch("vault") }
                 MenuSeparator {}
-                ShellMenuItem { text: "Lock Screen"; onTriggered: System.launch("lock") }
+                ShellMenuItem { text: System.privateMode ? "Lock Computer" : "Lock Screen"; onTriggered: System.launch("lock") }
+                ShellMenuItem { text: "Exit Private Workspace…"; visible: System.privateMode; onTriggered: System.launch("exit-private") }
             }
         }
         Text { text: root.activeApplication; width: Math.min(root.width<700?90:160,implicitWidth+18); height: 30; color: SettingsService.colors.text; font.pixelSize: 12; font.weight: Font.DemiBold; verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight }
@@ -60,18 +80,20 @@ Item {
     }
     readonly property var preferences:SettingsService.preferences
     readonly property var assistant:Workspace.assistant||({})
-    readonly property var order:String(preferences["bar.order"]||"network,bluetooth,sound,battery,notifications,updates,jared,search,control,calendar").split(",").concat(["downloads"]).filter((key,index,all)=>["network","bluetooth","sound","battery","notifications","updates","jared","search","control","calendar","downloads"].includes(key)&&all.indexOf(key)===index)
+    // JARED exists only in Private Mode; there the bar also ends with a security lock.
+    readonly property var order:String(preferences["bar.order"]||"network,bluetooth,sound,battery,notifications,updates,jared,search,control,calendar").split(",").concat(["downloads"]).concat(System.privateMode?["lock"]:[]).filter((key,index,all)=>["network","bluetooth","sound","battery","notifications","updates","search","control","calendar","downloads"].concat(System.privateMode?["jared","lock"]:[]).includes(key)&&all.indexOf(key)===index)
     property real popupX:width-400
     function positionPopup(button){popupX=Math.max(8,Math.min(width-380,button.mapToItem(root,0,0).x))}
     function battery(){return (Workspace.telemetry.batteries||[])[0]||({})}
-    function iconName(key){return ({network:"network",bluetooth:"bluetooth",sound:"sound",battery:"battery",notifications:"notifications",updates:"updates",jared:"jared",search:"search",control:"control",calendar:"clock",downloads:"downloads"})[key]}
-    function showMenu(key,button){positionPopup(button);if(key==="network")wifiPopover.open();else if(key==="bluetooth")bluetoothPopover.open();else if(key==="sound")soundPopover.open();else if(key==="calendar")calendarPopover.open();else if(key==="jared"){if(jaredMenu.visible)jaredMenu.close();else jaredMenu.open()}else if(key==="control"||key==="battery"||key==="notifications")controlPopover.open();else System.launch(key==="updates"||key==="downloads"?key:"library")}
+    function iconName(key){return ({network:"network",bluetooth:"bluetooth",sound:"sound",battery:"battery",notifications:"notifications",updates:"updates",jared:"jared",search:"search",control:"control",calendar:"clock",downloads:"downloads",lock:"lock"})[key]}
+    function showMenu(key,button){positionPopup(button);if(key==="lock"){System.launch("lock");return}if(key==="network")wifiPopover.open();else if(key==="bluetooth")bluetoothPopover.open();else if(key==="sound")soundPopover.open();else if(key==="calendar")calendarPopover.open();else if(key==="jared"){if(jaredMenu.visible)jaredMenu.close();else jaredMenu.open()}else if(key==="control"||key==="battery"||key==="notifications")controlPopover.open();else System.launch(key==="updates"||key==="downloads"?key:"library")}
     Row {id:statusIcons;anchors.right:parent.right;anchors.rightMargin:12;spacing:2
         Repeater {model:root.order
             BarButton {id:statusButton;required property string modelData
-                visible:(modelData==="downloads"?root.preferences["bar.show.downloads"]===true:root.preferences["bar.show."+modelData]!==false)&&(modelData!=="battery"||root.battery().percent>=0)&&(root.width>=700||["control","calendar","jared"].includes(modelData))
+                visible:(modelData==="lock"||(modelData==="downloads"?root.preferences["bar.show.downloads"]===true:root.preferences["bar.show."+modelData]!==false))&&(modelData!=="battery"||root.battery().percent>=0)&&(root.width>=700||["control","calendar","jared","lock"].includes(modelData))
                 implicitWidth:modelData==="calendar"?clockText.implicitWidth+20:modelData==="battery"?50:30
-                Accessible.name:modelData==="network"?Radio.wifiStatus:modelData==="bluetooth"?Radio.bluetoothStatus:modelData==="calendar"?"Calendar":modelData==="jared"?"JARED, "+(root.assistant.state||"offline"):modelData
+                Accessible.name:modelData==="network"?Radio.wifiStatus:modelData==="bluetooth"?Radio.bluetoothStatus:modelData==="calendar"?"Calendar":modelData==="jared"?"JARED, "+(root.assistant.state||"offline"):modelData==="lock"?"Lock computer":modelData
+                ShellToolTip {visible:statusButton.modelData==="lock"&&statusButton.hovered;delay:400;text:"Lock and return to the city lock screen"}
                 onClicked:root.showMenu(modelData,statusButton)
                 hoverEnabled:true
                 TapHandler {enabled:statusButton.modelData==="jared";acceptedButtons:Qt.RightButton;onTapped:Workspace.assistantCommand("preferences","")}

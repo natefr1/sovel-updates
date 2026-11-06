@@ -1,5 +1,10 @@
 # Sovel clean desktop rebuild · 0.1.0 engineering source
 
+**0.1.0-10 Dual Environment:** Normal Mode and an encrypted Private Mode
+(separate account, AES-256-XTS LUKS2 home, own VT) with privacy-first locking.
+Start with `docs/DUAL-ENVIRONMENT.md`; release notes are in `docs/UPDATE_10.md`;
+the browser preview is `preview/dual-environment.html`.
+
 **Work Mode continuation:** the current source now requires Qt 6.8 or newer.
 Read `docs/WORK-MODE-PROGRESS.md` for the newer implementation and target-VM
 evidence. The original foundation notes below describe the starting package;

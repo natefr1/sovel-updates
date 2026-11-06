@@ -1,0 +1,305 @@
+<title>Sovel Dual Environment</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans:wght@300;400;500;600&display=swap">
+<style>
+/* Layout: a control console on top, two monitors side by side, the transition log beneath.
+   A deliberate single dark theme: it depicts the OS screens themselves. */
+:root{
+  --ink:#06070b; --panel:#0e1017; --line:#232736; --text:#eef0f6; --muted:#9aa2b5;
+  --city:#8fa8ff; --lab:#bf40fa; --lab-blue:#4928c2; --periwinkle:#e3d9fc; --velvet:#5b2a62;
+  --live:#5acfe7; --ok:#7fe0b5; --warn:#e9b957; --bad:#ff8fa8;
+  --display:"Chakra Petch","Noto Sans",system-ui,sans-serif;
+  --body:"Noto Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--ink);color:var(--text);font-family:var(--body);line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 48px}
+.wrap{max-width:1360px;margin:0 auto;display:grid;gap:22px}
+header{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:12px 24px}
+h1{font-family:var(--display);font-weight:600;font-size:clamp(22px,3vw,30px);letter-spacing:.02em;margin:0;text-wrap:balance}
+header p{margin:4px 0 0;color:var(--muted);max-width:62ch}
+.state{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;padding:6px 12px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.state b{color:var(--text);font-weight:500}
+.state[data-mode=private] b{color:var(--lab)}
+.state[data-mode=normal] b{color:var(--city)}
+.console{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+.console .label{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-right:4px}
+button{font:inherit;font-size:13px;color:var(--text);background:#181b25;border:1px solid var(--line);border-radius:10px;padding:8px 14px;cursor:pointer}
+button:hover:not(:disabled){border-color:#3a4058;background:#1f2331}
+button:focus-visible{outline:2px solid var(--city);outline-offset:2px}
+button:disabled{opacity:.35;cursor:not-allowed}
+button kbd{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:6px}
+.toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-left:auto}
+.toggle input{accent-color:var(--lab)}
+.monitors{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:18px}
+figure{margin:0;display:grid;gap:8px;min-width:0}
+figcaption{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.screen{position:relative;aspect-ratio:16/9;max-width:100%;border-radius:10px;overflow:hidden;background:#000;border:6px solid #11131a;box-shadow:0 18px 50px rgba(0,0,0,.5);isolation:isolate}
+.layer{position:absolute;inset:0;transition:opacity .35s ease}
+.layer[hidden]{display:block!important;opacity:0;pointer-events:none}
+.wall{background-size:cover;background-position:center}
+.wall.city{background-image:url("preview-assets/city.jpg")}
+.wall.emblem{background-image:url("preview-assets/emblem.jpg")}
+.cover{position:absolute;inset:0;background:#000;z-index:50;opacity:0;pointer-events:none;transition:opacity .08s linear}
+.cover.on{opacity:1}
+/* OS chrome inside the screens, scaled with the container */
+.screen{container-type:inline-size}
+.bar{position:absolute;inset:0 0 auto;height:4.2cqi;display:flex;align-items:center;gap:1.4cqi;padding:0 1.4cqi;font-size:1.25cqi;color:#eef0f6;z-index:5}
+.bar.normal{background:linear-gradient(rgba(34,37,45,.72),rgba(19,21,26,.72));border-bottom:1px solid rgba(255,255,255,.10)}
+.bar.lab{background:linear-gradient(rgba(19,11,29,.86),rgba(5,4,10,.9));border-bottom:1px solid rgba(191,64,250,.30)}
+.bar .spacer{flex:1}
+.bar .app{font-weight:600}
+.pill{display:flex;align-items:center;gap:.7cqi;padding:.25cqi 1cqi;border-radius:2cqi;border:1px solid rgba(185,139,255,.35);background:rgba(0,0,0,.4);font-family:var(--mono);font-size:1cqi;letter-spacing:.12em}
+.pill i{width:.7cqi;height:.7cqi;border-radius:50%;background:var(--live);box-shadow:0 0 .8cqi var(--live)}
+.pill .st{color:var(--live)}
+.ico{width:1.6cqi;height:1.6cqi;opacity:.9}
+.dock{position:absolute;left:50%;bottom:1.6cqi;transform:translateX(-50%);display:flex;gap:1cqi;padding:.9cqi 1.3cqi;border-radius:2.2cqi;z-index:5}
+.dock.normal{background:linear-gradient(rgba(36,39,48,.62),rgba(18,20,26,.72));border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 1px rgba(255,255,255,.18)}
+.dock.lab{background:linear-gradient(rgba(22,12,34,.74),rgba(6,4,12,.84));border:1px solid rgba(185,139,255,.32);box-shadow:inset 0 1px rgba(227,217,252,.22)}
+.dock span{width:3.6cqi;height:3.6cqi;border-radius:.9cqi;display:grid;place-items:center;font-size:1.5cqi;font-weight:600;color:#fff}
+.glass{position:absolute;border-radius:1.6cqi;padding:1.3cqi 1.5cqi;font-size:1.15cqi;color:#eef0f6;z-index:4}
+.glass.normal{background:linear-gradient(rgba(36,39,48,.62),rgba(18,20,26,.70));border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 1px rgba(255,255,255,.18)}
+.glass.lab{background:linear-gradient(rgba(22,12,34,.78),rgba(6,4,12,.86));border:1px solid rgba(185,139,255,.30);box-shadow:inset 0 1px rgba(227,217,252,.20)}
+.glass h4{margin:0 0 .6cqi;font-family:var(--mono);font-weight:500;font-size:.95cqi;letter-spacing:.14em;text-transform:uppercase;color:#aab3c7}
+.glass.lab h4{color:#b3a6cc}
+.big{font-weight:300;font-size:3.4cqi;line-height:1;letter-spacing:-.04em}
+.meter{height:.5cqi;border-radius:.3cqi;background:rgba(255,255,255,.08);overflow:hidden;margin:.45cqi 0 .7cqi}
+.meter b{display:block;height:100%;background:linear-gradient(90deg,var(--lab-blue),var(--lab))}
+.row{display:flex;justify-content:space-between;gap:1cqi;font-variant-numeric:tabular-nums}
+.mono{font-family:var(--mono)}
+.window{position:absolute;border-radius:1cqi;overflow:hidden;background:#f6f7fa;color:#1b1d22;font-size:1.1cqi;box-shadow:0 2cqi 4cqi rgba(0,0,0,.45);z-index:3}
+.window .tb{height:2.6cqi;background:#e6e8ee;display:flex;align-items:center;gap:.6cqi;padding:0 1cqi;font-weight:600}
+.window .tb i{width:.9cqi;height:.9cqi;border-radius:50%}
+.window .body{padding:1.2cqi;display:grid;gap:.8cqi}
+.skel{height:.9cqi;border-radius:.5cqi;background:#d9dce4}
+.lock{position:absolute;inset:0;display:grid;place-items:center;align-content:center;gap:1.2cqi;z-index:6;text-align:center}
+.lock .clock{font-size:8.5cqi;font-weight:200;letter-spacing:-.05em;line-height:1}
+.lock .date{font-size:1.5cqi;color:#d4d9e4;margin-top:-.4cqi}
+.lock .card{margin-top:2cqi;width:30cqi;max-width:90%;padding:1.6cqi;border-radius:2cqi;background:rgba(20,24,34,.58);border:1px solid rgba(255,255,255,.22);box-shadow:inset 0 1px rgba(255,255,255,.3);display:grid;gap:1cqi}
+.lock .field{height:3.3cqi;border-radius:1cqi;background:rgba(8,10,16,.55);border:1px solid rgba(255,255,255,.28);display:flex;align-items:center;padding:0 1.2cqi;font-size:1.2cqi;color:#c9cfda;text-align:left}
+.lock .btn{height:3.1cqi;border-radius:1cqi;background:linear-gradient(#8fa8ff,#5b7be8);display:grid;place-items:center;font-size:1.2cqi;font-weight:500}
+.lockdim{position:absolute;inset:0;background:linear-gradient(rgba(6,10,24,.10),rgba(6,10,24,.45))}
+.greeter{position:absolute;inset:0;background:#040607;z-index:6}
+.greeter .emblem{position:absolute;inset:0 0 34% 0;background:url("preview-assets/emblem.jpg") center/contain no-repeat}
+.greeter .term{position:absolute;left:50%;bottom:6%;transform:translateX(-50%);width:40cqi;max-width:92%;padding:1.6cqi;border-radius:1.8cqi;background:linear-gradient(rgba(19,11,29,.9),rgba(5,4,10,.95));border:1px solid rgba(191,64,250,.4);font-family:var(--mono);font-size:1.15cqi;display:grid;gap:.7cqi}
+.greeter .term .hl{color:var(--lab)}
+.greeter .term .mut{color:#b3a6cc}
+.greeter .field{height:3.1cqi;border-radius:1cqi;background:rgba(0,0,0,.5);border:1px solid var(--lab);display:flex;align-items:center;padding:0 1cqi;letter-spacing:.3em}
+.brackets::before,.brackets::after{content:"";position:absolute;width:2cqi;height:2cqi;border:1px solid rgba(191,64,250,.7)}
+.brackets::before{left:.8cqi;top:.8cqi;border-right:0;border-bottom:0}
+.brackets::after{right:.8cqi;bottom:.8cqi;border-left:0;border-top:0}
+.blank{position:absolute;inset:0;background:#000;z-index:6;display:grid;place-items:center;color:#2b2f3c;font-family:var(--mono);font-size:1.1cqi;letter-spacing:.2em}
+/* Log and facts */
+.lower{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:18px}
+@media (max-width:860px){.lower{grid-template-columns:1fr}}
+section.card{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:16px 18px;min-width:0}
+section.card h2{font-family:var(--display);font-weight:500;font-size:15px;letter-spacing:.06em;text-transform:uppercase;margin:0 0 10px;color:var(--periwinkle)}
+ol.log{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-family:var(--mono);font-size:12.5px;max-height:300px;overflow:auto}
+ol.log li{display:grid;grid-template-columns:5.5em 1fr;gap:10px;padding:6px 8px;border-radius:8px;background:#121520}
+ol.log time{color:var(--muted);font-variant-numeric:tabular-nums}
+ol.log .ok{color:var(--ok)} ol.log .warn{color:var(--warn)} ol.log .bad{color:var(--bad)} ol.log .lab{color:var(--lab)} ol.log .city{color:var(--city)}
+dl.facts{margin:0;display:grid;grid-template-columns:auto 1fr;gap:8px 14px;font-size:13px}
+dl.facts dt{color:var(--muted);font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;padding-top:2px}
+dl.facts dd{margin:0}
+.note{font-size:12.5px;color:var(--muted);margin:12px 0 0}
+@media (prefers-reduced-motion:reduce){.layer,.cover{transition:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Sovel Dual Environment</h1>
+      <p>Normal Mode is the computer anyone can use. Private Mode is a separate encrypted account on its own virtual terminal. Every lock covers both displays first, then shows the same city lock screen.</p>
+    </div>
+    <div class="state" id="state" data-mode="normal">VT <b id="vt">7</b> · <b id="stateName">Locked</b></div>
+  </header>
+
+  <div class="console" role="group" aria-label="Simulated actions">
+    <span class="label">Actions</span>
+    <button id="unlockNormal">Unlock Normal</button>
+    <button id="enterPrivate">Enter Private<kbd>Super+Shift+P</kbd></button>
+    <button id="unlockPrivate">Unlock Private</button>
+    <button id="lock">Lock<kbd>Super+L</kbd></button>
+    <button id="sleep">Close lid</button>
+    <button id="exitPrivate">Exit Private Workspace</button>
+    <label class="toggle" for="unsaved"><input type="checkbox" id="unsaved"> An editor has unsaved changes</label>
+  </div>
+
+  <div class="monitors">
+    <figure>
+      <figcaption><span>Display 01 · DP-1 · primary</span><span id="d1label">City lock</span></figcaption>
+      <div class="screen" id="d1">
+        <div class="layer wall city" id="d1city"></div>
+        <div class="layer wall emblem" id="d1emblem" hidden></div>
+        <!-- Normal desktop -->
+        <div class="layer" id="d1normal" hidden>
+          <div class="bar normal"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/></svg><span class="app">Files</span><span>File</span><span>View</span><span>Window</span><span class="spacer"></span><span>Wi-Fi</span><span>Sound</span><span class="mono" data-clock></span></div>
+          <div class="glass normal" style="right:2cqi;top:7cqi;width:17cqi"><h4>Clock</h4><div class="big" data-clock-big></div><div style="color:#aab3c7;margin-top:.6cqi" data-date></div></div>
+          <div class="glass normal" style="right:2cqi;top:21cqi;width:17cqi"><h4>Calendar</h4><div>Dentist · 4:30 PM</div><div style="color:#aab3c7">Groceries · 6:00 PM</div></div>
+          <div class="window" style="left:6cqi;top:9cqi;width:46cqi"><div class="tb"><i style="background:#ff625b"></i><i style="background:#ffbf43"></i><i style="background:#30c94b"></i>&nbsp;Home — Files</div><div class="body"><div class="row"><span>Documents</span><span>Pictures</span><span>Music</span><span>Downloads</span></div><div class="skel" style="width:70%"></div><div class="skel" style="width:55%"></div><div class="skel" style="width:62%"></div></div></div>
+          <div class="dock normal"><span style="background:#4f6fe0">F</span><span style="background:#e0623b">B</span><span style="background:#2a8d6b">S</span><span style="background:#59606f">⚙</span><span style="background:#22252d">›_</span></div>
+        </div>
+        <!-- Private desktop -->
+        <div class="layer" id="d1private" hidden>
+          <div class="bar lab"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/></svg><span class="app">SOVEL</span><span>Workspace 1</span><span class="spacer"></span><span class="pill"><i></i>JARED <span class="st">LISTENING</span> <span style="color:#b3a6cc">web-shooter tolerances</span></span><span class="spacer"></span><span>Wi-Fi</span><span>GPU 41°</span><span class="mono" data-clock></span><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="#e3d9fc" stroke-width="2"><rect x="5" y="11" width="14" height="10"/><path d="M7.5 11a4.5 4.5 0 0 1 9 0"/></svg></div>
+          <div class="glass lab" style="right:2cqi;top:7cqi;width:18cqi"><h4>JARED · Notes</h4><div>Spider-Sense sensor array</div><div style="color:#b3a6cc">3 tasks awaiting review</div></div>
+          <div class="window" style="left:5cqi;top:9cqi;width:50cqi;background:#0e0a15;color:#e3d9fc"><div class="tb" style="background:#1a1226;color:#e3d9fc"><i style="background:#ff625b"></i><i style="background:#ffbf43"></i><i style="background:#30c94b"></i>&nbsp;web-shooter.kicad</div><div class="body"><div class="row mono"><span>R1 4.7k</span><span>C3 22µF</span><span>U2 DRV8833</span></div><div class="skel" style="width:76%;background:#2a1d3d"></div><div class="skel" style="width:58%;background:#2a1d3d"></div><div class="skel" style="width:66%;background:#2a1d3d"></div></div></div>
+          <div class="dock lab"><span style="background:#2b1e3b">F</span><span style="background:#e0623b">B</span><span style="background:linear-gradient(#d4b2ff,#6c3ac2)">✦</span><span style="background:#0e0a15;border:1px solid #5b2a62">⌾</span><span style="background:#2b1e3b">⚙</span><span style="background:#15101e">›_</span></div>
+        </div>
+        <!-- City lock (both sessions use the same one) -->
+        <div class="layer" id="d1lock"><div class="lockdim"></div><div class="lock"><div class="clock" data-clock-big></div><div class="date" data-date></div><div class="card"><div class="field">Password</div><div class="btn">Unlock</div></div></div></div>
+        <!-- Private greeter / private lock on VT 8 -->
+        <div class="layer" id="d1greeter" hidden><div class="greeter"><div class="emblem"></div><div class="term brackets"><span class="hl">&gt;&gt; PRIVATE WORKSPACE · <span data-clock></span></span><span class="mut">&gt;&gt; identity required</span><span class="mut">&gt; authenticate</span><div class="field">••••••••••</div></div></div></div>
+        <div class="cover" id="d1cover"></div>
+      </div>
+    </figure>
+    <figure>
+      <figcaption><span>Display 02 · HDMI-A-1</span><span id="d2label">City lock</span></figcaption>
+      <div class="screen" id="d2">
+        <div class="layer wall city" id="d2city"></div>
+        <div class="layer wall emblem" id="d2emblem" style="filter:brightness(.45)" hidden></div>
+        <div class="layer" id="d2normal" hidden>
+          <div class="window" style="left:5cqi;top:5cqi;width:58cqi"><div class="tb"><i style="background:#ff625b"></i><i style="background:#ffbf43"></i><i style="background:#30c94b"></i>&nbsp;Weather and news — Brave</div><div class="body"><div class="skel" style="width:40%;height:1.6cqi"></div><div class="skel" style="width:85%"></div><div class="skel" style="width:80%"></div><div class="skel" style="width:72%"></div><div class="skel" style="width:60%"></div></div></div>
+          <div class="glass normal" style="right:2cqi;bottom:3cqi;width:18cqi"><h4>Extended desktop</h4><div>Drag windows between displays</div></div>
+        </div>
+        <div class="layer" id="d2private" hidden>
+          <div class="glass lab" style="left:2cqi;top:2cqi;width:44cqi;height:34cqi"><h4>JARED · Command queue</h4><div class="row"><span>Summarize adhesion papers</span><span class="mono" style="color:var(--live)">RUNNING</span></div><div class="row"><span>Import TODOs from notes</span><span class="mono" style="color:var(--warn)">APPROVAL</span></div><div class="row"><span>Rebuild SVL parser</span><span class="mono" style="color:var(--ok)">DONE</span></div><div class="row" style="margin-top:1cqi;color:#b3a6cc"><span>Local model</span><span class="mono">qwen3.5-4b · GPU</span></div></div>
+          <div class="glass lab" style="left:48cqi;top:2cqi;width:24cqi;height:34cqi"><h4>Projects</h4><div>Spider-Sense · 62%</div><div class="meter"><b style="width:62%"></b></div><div>Web-shooter · 38%</div><div class="meter"><b style="width:38%"></b></div><div>Sovel OS · 81%</div><div class="meter"><b style="width:81%"></b></div></div>
+          <div class="glass lab" style="right:2cqi;top:2cqi;width:22cqi;height:34cqi"><h4>Tasks</h4><div>☐ Order ultrasonic array</div><div>☑ Lab power budget</div><div>☐ Calibrate IRIS camera</div></div>
+          <div class="glass lab" style="left:2cqi;bottom:2cqi;width:22cqi"><h4>CPU</h4><div class="row"><span class="big" style="font-size:2.6cqi">23%</span><span class="mono" style="color:#b3a6cc">8C/16T</span></div><div class="meter"><b style="width:23%"></b></div></div>
+          <div class="glass lab" style="left:26cqi;bottom:2cqi;width:22cqi"><h4>GPU · GTX 1070</h4><div class="row"><span class="big" style="font-size:2.6cqi">41%</span><span class="mono" style="color:#b3a6cc">41 °C</span></div><div class="meter"><b style="width:41%"></b></div></div>
+          <div class="glass lab" style="left:50cqi;bottom:2cqi;width:22cqi"><h4>Memory</h4><div class="row"><span class="big" style="font-size:2.6cqi">11.2</span><span class="mono" style="color:#b3a6cc">of 32 GB</span></div><div class="meter"><b style="width:35%"></b></div></div>
+          <div class="glass lab" style="right:2cqi;bottom:2cqi;width:22cqi"><h4>Transfers</h4><div class="row"><span>Backup</span><span class="mono" style="color:var(--ok)">Sealed</span></div><div class="row"><span>datasheet.pdf</span><span class="mono">72%</span></div></div>
+        </div>
+        <div class="layer" id="d2lock"><div class="lockdim"></div></div>
+        <div class="layer" id="d2blank" hidden><div class="blank">PRIVATE WORKSPACE · SIGN-IN ON DISPLAY 01</div></div>
+        <div class="cover" id="d2cover"></div>
+      </div>
+    </figure>
+  </div>
+
+  <div class="lower">
+    <section class="card">
+      <h2>Transition log</h2>
+      <ol class="log" id="log" aria-live="polite"></ol>
+    </section>
+    <section class="card">
+      <h2>What protects it</h2>
+      <dl class="facts">
+        <dt>Private storage</dt><dd>LUKS2 home image, AES-256-XTS, 512-bit key, argon2id, recovery key</dd>
+        <dt>Vault</dt><dd>gocryptfs folder, AES-256-GCM, its own passphrase, closes on every lock</dd>
+        <dt>Separation</dt><dd>Separate Linux user, compositor, clipboard, notifications, search and display profiles</dd>
+        <dt>Lock order</dt><dd>Cover every output, confirm, then quiet JARED, clear clipboard, close Vault, switch VT</dd>
+        <dt>Normal Mode</dt><dd>No JARED button, dock icon, shortcut, widget or Settings page. The binary refuses to start it.</dd>
+        <dt>Not covered</dt><dd>Administrators and root, and a compromised kernel. An open session keeps its key in memory until you exit or seal.</dd>
+      </dl>
+      <p class="note">Preview only. The wallpapers are the real Sovel assets; the timings and window contents are illustrative.</p>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const state = { vt: 7, normal: 'locked', priv: 'none' }; // priv: none | locked | open
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const wait = ms => new Promise(r => setTimeout(r, reduced ? 0 : ms));
+  let t0 = performance.now(), busy = false;
+
+  function stamp(){ return ((performance.now() - t0) / 1000).toFixed(2) + ' s'; }
+  function log(text, tone){
+    const li = document.createElement('li');
+    li.innerHTML = '<time>' + stamp() + '</time><span class="' + (tone || '') + '"></span>';
+    li.lastChild.textContent = text;
+    $('log').appendChild(li); $('log').scrollTop = $('log').scrollHeight;
+  }
+  function tick(){
+    const now = new Date();
+    const hm = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    const day = now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+    document.querySelectorAll('[data-clock]').forEach(n => n.textContent = hm);
+    document.querySelectorAll('[data-clock-big]').forEach(n => n.textContent = hm);
+    document.querySelectorAll('[data-date]').forEach(n => n.textContent = day);
+  }
+  function show(ids){
+    ['d1city','d1emblem','d1normal','d1private','d1lock','d1greeter','d2city','d2emblem','d2normal','d2private','d2lock','d2blank']
+      .forEach(id => $(id).hidden = !ids.includes(id));
+  }
+  function render(){
+    let ids, l1, l2, name, mode;
+    if (state.vt === 7) {
+      mode = 'normal';
+      if (state.normal === 'open') { ids = ['d1city','d1normal','d2city','d2normal']; l1 = 'Normal desktop'; l2 = 'Extended desktop'; name = 'Normal Mode'; }
+      else { ids = ['d1city','d1lock','d2city','d2lock']; l1 = l2 = 'City lock'; name = 'Locked'; }
+    } else {
+      mode = 'private';
+      if (state.priv === 'open') { ids = ['d1emblem','d1private','d2emblem','d2private']; l1 = 'Private desktop'; l2 = 'Command center'; name = 'Private Mode'; }
+      else if (state.priv === 'locked') { ids = ['d1city','d1lock','d2city','d2lock']; l1 = l2 = 'City lock (private session)'; name = 'Private, locked'; }
+      else { ids = ['d1greeter','d2blank']; l1 = 'Private sign-in'; l2 = 'Waiting'; name = 'Private sign-in'; }
+    }
+    show(ids);
+    $('d1label').textContent = l1; $('d2label').textContent = l2;
+    $('stateName').textContent = name; $('vt').textContent = state.vt; $('state').dataset.mode = mode;
+    const normalActive = state.vt === 7, privateActive = state.vt === 8;
+    $('unlockNormal').disabled = busy || !(normalActive && state.normal === 'locked');
+    $('enterPrivate').disabled = busy || !(normalActive && state.normal === 'open');
+    $('unlockPrivate').disabled = busy || !(privateActive && state.priv !== 'open');
+    $('lock').disabled = busy || !((normalActive && state.normal === 'open') || (privateActive && state.priv === 'open'));
+    $('sleep').disabled = busy || $('lock').disabled;
+    $('exitPrivate').disabled = busy || !(privateActive && state.priv === 'open');
+  }
+  async function cover(on){ $('d1cover').classList.toggle('on', on); $('d2cover').classList.toggle('on', on); }
+  async function run(fn){ if (busy) return; busy = true; render(); try { await fn(); } finally { busy = false; render(); } }
+
+  async function confirmLock(where){
+    log('gtklock requests ext-session-lock on DP-1 and HDMI-A-1');
+    await cover(true); await wait(140);
+    log('Both outputs covered. Lock confirmed by --lock-command', 'ok');
+  }
+  $('unlockNormal').onclick = () => run(async () => {
+    log('Normal password accepted on VT 7', 'city'); state.normal = 'open'; await wait(120);
+    log('Normal Mode opens. The private session stays locked on VT 8.');
+  });
+  $('enterPrivate').onclick = () => run(async () => {
+    log('Super+Shift+P → sovel-mode enter-private', 'lab');
+    await confirmLock(); state.normal = 'locked';
+    await wait(120); state.vt = 8; render(); await cover(false);
+    log(state.priv === 'none' ? 'Switched to VT 8: private sign-in (password only, no username shown)' : 'Switched to VT 8: the private session is still locked', 'lab');
+  });
+  $('unlockPrivate').onclick = () => run(async () => {
+    log(state.priv === 'none' ? 'homed unlocks the LUKS2 home with the private password' : 'Private password accepted', 'lab');
+    await wait(220); state.priv = 'open';
+    log('Private desktop and command center appear together', 'lab');
+  });
+  async function lockFlow(reason){
+    if (state.vt === 7) {
+      log(reason + ' → sovel-mode lock (Normal)');
+      await confirmLock(); state.normal = 'locked'; render(); await wait(90); await cover(false);
+      return;
+    }
+    log(reason + ' → sovel-mode lock (Private)', 'lab');
+    await confirmLock(); state.priv = 'locked'; render();
+    log('JARED voice stopped, current request cancelled'); await wait(60);
+    log('Clipboard cleared'); await wait(60);
+    log('Vault unmounted and encrypted'); await wait(60);
+    state.vt = 7; render(); await wait(80); await cover(false);
+    log('Switched to VT 7: the city lock. Unlocking it opens Normal Mode only.', 'ok');
+  }
+  $('lock').onclick = () => run(() => lockFlow('Super+L'));
+  $('sleep').onclick = () => run(() => lockFlow('Lid closed: before-sleep'));
+  $('exitPrivate').onclick = () => run(async () => {
+    log('Exit Private Workspace → close every window', 'lab'); await wait(220);
+    if ($('unsaved').checked) { log('1 window is still open (unsaved changes). Nothing was closed or sealed.', 'warn'); return; }
+    log('All windows closed. Vault sealed. Clipboard cleared.', 'ok');
+    await cover(true); await wait(120);
+    state.priv = 'none'; state.vt = 7; render(); await wait(80); await cover(false);
+    log('Session ended. homed deactivated the home and dropped its key.', 'ok');
+  });
+
+  tick(); setInterval(tick, 15000); render();
+  log('Boot: greetd shows the city sign-in on VT 7. The private greeter waits on VT 8.');
+})();
+</script>

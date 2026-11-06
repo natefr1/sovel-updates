@@ -13,7 +13,7 @@ private slots:
  void initTestCase(){qputenv("XDG_CONFIG_HOME",temporary.path().toUtf8());qputenv("XDG_DATA_HOME",(temporary.path()+"/data").toUtf8());}
  void layoutValidationPersistenceAndEmptyState(){
   Backend backend;SettingsService settings(nullptr,false);
-  {Workspace workspace(&backend,&settings,false);QCOMPARE(workspace.registry().size(),26);QVERIFY(workspace.addWidget("unknown").isEmpty());
+  {Workspace workspace(&backend,&settings,false);QCOMPARE(workspace.registry().size(),23); // Normal Mode: JARED, projects and AI monitor widgets are private-onlyQVERIFY(workspace.addWidget("unknown").isEmpty());
    const auto id=workspace.addWidget("todo");QVERIFY(!id.isEmpty());QVERIFY(workspace.configureWidget(id,"large",65,15));QVERIFY(workspace.moveWidget(id,.25,.75));
    QVERIFY(workspace.setWidgetData(id,{{"title","Tasks"},{"items",QVariantList{QVariantMap{{"text","Keep existing Store apps"},{"done",false}}}}}));
    QVERIFY(!workspace.configureWidget(id,"impossible",65,15));QVERIFY(!workspace.setWidgetData("unknown",{}));
