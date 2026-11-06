@@ -1,5 +1,8 @@
 # Sovel public updates
 
+Desktop update `0.1.0-9` **Workspace** adds multi-display controls, Sovel Files improvements and
+JARED Notes, Projects, Research and local voice. See the [Workspace release notes](releases/0.1.0-9.md).
+
 Desktop update `0.1.0-8` **Horizon** adds 29 Settings pages, Wi-Fi discovery and saved profiles,
 configurable menu-bar controls, signed release history, 14 additional Store apps
 and 24 configurable widgets. All previous Store listings and the greeter are preserved.

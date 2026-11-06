@@ -5,29 +5,29 @@ Origin: Sovel
 Label: Sovel Public Updates
 Suite: stable
 Codename: stable
-Date: Wed, 04 Nov 2026 21:49:26 GMT
-Valid-Until: Fri, 04 Dec 2026 21:49:26 GMT
+Date: Fri, 06 Nov 2026 03:03:02 GMT
+Valid-Until: Sun, 06 Dec 2026 03:03:02 GMT
 Architectures: amd64
 Components: main
 Description: Signed Sovel public system updates
 Acquire-By-Hash: yes
 SHA256:
- 718cbaca291e418d36d88294853a549be217b8f5b7fd9b8a2f2859feafcd727c            15717 main/binary-amd64/Packages
- 74b26405fc6822d605485bc65f793cbd9b415699fa56da40bbd8e7d57dac3e1b             4042 main/binary-amd64/Packages.gz
+ f541682cf886a687b24a04731fb385019c8b07f0d435c1ea27a607e6149b9276            18895 main/binary-amd64/Packages
+ 1f02296498731f9ce89212b2708179b3a66ba3b1cf1bb17c99338a66d818f82f             4888 main/binary-amd64/Packages.gz
 SHA512:
- 8edb99fc6297ede6c8a58fd5221291eb5bf265263cbc487a0b71a4b74f54bddb9ca30ffc8b8c93629c44d5db72c8eb50f79a700f4fd823e47832e591f5dc268c            15717 main/binary-amd64/Packages
- 36483c1a2b9a872bc7c3e3f7dc6e507cb99c63763c6dd632073f197a1d061a3a1bdfe693c4c2208fa018a3b55e6b9f4c8723908e59320883fb1a0e2237c598f1             4042 main/binary-amd64/Packages.gz
+ a27aa80d45a7393094f90480342c6ce2f37541f6fdbc22669dbd062e81a362b13dc5df9d00def4a265b70aa1e20e1eb7e661aa0dfbaad9183d1af7239fe608c9            18895 main/binary-amd64/Packages
+ a9f34408e173fa800ba02e864217013f27ef64876ca242e18ee115d28fda8ec8e9470460bde86ba0a47332a40bf1efe923d51d847a5ef32623b367769623cd06             4888 main/binary-amd64/Packages.gz
 -----BEGIN PGP SIGNATURE-----
 
-iQGzBAEBCAAdFiEEvpHcgObHBJ253EwBO+ftt/3SeywFAmrrqGYACgkQO+ftt/3S
-eyx/zAv9E6VTS10QlOun5FK04jWtBbFbt4e03ner23ouWhhO0Zrr3sq1QUv8qCKP
-Mq2zn7J5vFwLv4+qEYOXZGd5vLAHo1vxX3DEvwQbUevc5sThdK3V9UH7BPAoe6Y+
-oUhDJZ5AFkO58UrIvIXaoYasrBQRPmyIiwTpXoBba3CVQppURPQnB4HsoqTXT6hn
-gzr6cee2FB2yz3Q53O+lZUlVKCw2sRrzDltBoMFNzJdzgWZlfoDs+s4nFz1rMDg2
-DRbMZxnDTvSD8enbRiWoIvIIclJOI5sroTXCKrwdSZU9gyVQrHE2v6wcNSl+1CfJ
-24V40FI5yemFwTItNZBoNxpbMGsrcjD+FG0BI/F62Ba7QKxa+63BI7Dpxs8CxN+f
-3yqLL3+irC5AzpERNdedE5ODJXIZGfqxzgKIPlTQwh9vDRbS0k98QlqCBWaigwkq
-nGBt6T+6rGlEzfl8j3SaRDR9hTM4ge3v7fOSncBFYRYDhd/bCFP1C7l4xzMWVtm6
-VDyTpKn+
-=+K6s
+iQGzBAEBCAAdFiEEvpHcgObHBJ253EwBO+ftt/3SeywFAmrtQ2YACgkQO+ftt/3S
+eyz23Av/W3m9ZcVCdUt/nTXn5e3rV4lv53iaH63HlQC/f6Ittma/BwwQVEazYlLD
++AvKx/iFgay8QioeKJSZ0QtKnWihQK7/O8pHlPfqBgAYTG6olnvU5YzlpO5Jps5U
+H00naqEZfdsV9w+Mc4HOKVU3nVNcoMFJCojf/XWFQCqSnvDxMrhaMwQkwMBlhbD3
+48H+x4oPmHNR82/4OTPChej1BZ6toe4/ccH93oYaL55KIl12VfQ+qF978kGuzaAp
+xYin88UjkmTSuXi1YruEsgBPI/Ftjd7ziXMmDxmCs9oU3jIjL6FslrecIlSP8wY4
+tv1Pg4J0f6vsL9xpcCkFZMZeeuCUWLavIoGhgAhQQBM3aRtNMdIKby7MtGaMdyFj
+XJgKyyLKH3S+F0FXr/2CwQw8Iqo/hOfN/AkX1Kv/L+eiFnT0R1DxMtMGp/6TIXOr
+1jTRmciHhEEW71bT1T+ofv7Q2dxIZVpjG8fFkdhXp7hW8ESti817X8JZPOz3LDVI
+jJpqx85b
+=f+4w
 -----END PGP SIGNATURE-----
