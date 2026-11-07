@@ -50,6 +50,9 @@ class ModeTransitions(unittest.TestCase):
         m.vault_lock = lambda: self.events.append(('vault',)) or 0
         m.end_session = lambda: self.events.append(('end',)) or True
         m.spawn = lambda *a: self.events.append(('spawn',) + a)
+        m.greeter_state = lambda: 'active'
+        m.log = lambda message: None
+        m.open_setup = lambda: self.events.append(('setup',))
 
     def tearDown(self):
         self.temporary.cleanup()
@@ -99,6 +102,21 @@ class ModeTransitions(unittest.TestCase):
         self.mode.lock_screen = lambda: self.events.append(('lock', True)) or True
         self.assertEqual(self.run_command('enter-private'), 0)
         self.assertEqual(self.events, [('lock', True), ('switch', 8)])
+
+    def test_enter_private_never_locks_for_a_missing_greeter(self):
+        self.mode.private_mode = lambda: False
+        self.mode.greeter_state = lambda: 'failed'
+        self.mode.lock_screen = lambda: self.events.append(('lock', True)) or True
+        self.assertEqual(self.run_command('enter-private'), 1)
+        self.assertNotIn('lock', self.kinds())
+        self.assertNotIn('switch', self.kinds())
+
+    def test_enter_private_before_setup_opens_setup(self):
+        self.mode.private_mode = lambda: False
+        self.mode.config = lambda: None
+        self.mode.lock_screen = lambda: self.events.append(('lock', True)) or True
+        self.assertEqual(self.run_command('enter-private'), 2)
+        self.assertEqual(self.kinds(), ['notify', 'setup'])
 
     def test_exit_private_keeps_session_when_windows_remain(self):
         self.mode.private_mode = lambda: True
@@ -167,7 +185,9 @@ class PrivateAdministration(unittest.TestCase):
         a = self.admin
         a.read_config = lambda: {'user': 'nate-lab', 'normal_user': '', 'normal_vt': 7, 'private_vt': 8, 'shortcut': 'W-S-p'}
         a.homed_record = lambda user: {'storage': 'luks', 'luksCipher': 'aes', 'luksCipherMode': 'xts-plain64', 'luksVolumeKeySize': 64,
-                                       'status': {'machine': {'state': 'inactive'}}}
+                                       'status': {'test-machine': {'state': 'inactive'}}}
+        a.MACHINE_ID = Path(tempfile.mkdtemp()) / 'machine-id'
+        a.MACHINE_ID.write_text('test-machine\n')
         a.output = lambda *args, **kwargs: ''
         checks = {c['id']: c for c in a.isolation_report()['checks']}
         self.assertEqual(checks['encryption']['status'], 'ok')
@@ -274,6 +294,25 @@ class SessionKeybinds(unittest.TestCase):
             binds = {b.get('key'): b.find('action').get('command', '') for b in root.find('keyboard') if b.tag == 'keybind'}
             self.assertIn('W-j', binds)
             self.assertNotIn('W-S-p', binds)
+
+    def test_before_setup_normal_keeps_jared_and_shortcut_opens_setup(self):
+        helper = load('sovel-settings-helper')
+        with tempfile.TemporaryDirectory() as folder:
+            helper.PRIVATE_CONFIG = Path(folder) / 'missing.conf'
+            helper.CONFIG = Path(folder) / 'Sovel'
+            helper.private_mode = lambda: False
+            env = os.environ.pop('WAYLAND_DISPLAY', None)
+            try:
+                helper.apply_preferences()
+            finally:
+                if env is not None:
+                    os.environ['WAYLAND_DISPLAY'] = env
+            root = ET.parse(helper.CONFIG / 'labwc/rc.xml').getroot()
+            binds = {b.get('key'): b.find('action').get('command', '') for b in root.find('keyboard') if b.tag == 'keybind'}
+            self.assertIn('W-j', binds)  # no private account yet, so JARED stays here
+            self.assertEqual(binds['W-S-p'], '/usr/bin/sovel-mode enter-private')
+            self.assertTrue(helper.assistant_available())
+            self.assertIn('rows', helper.report('jared') if hasattr(helper, 'report') else {'rows': []})
 
 
 if __name__ == '__main__':

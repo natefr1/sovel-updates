@@ -1,0 +1,63 @@
+#!/bin/sh
+# Guided Private Workspace setup, opened from Settings → Private Workspace in
+# Normal Mode. Every step is shown first and nothing changes until you agree.
+set -u
+
+pause() { printf '\nPress Enter to close this window. '; read -r _ || true; }
+fail() { printf '\n%s\n' "$1"; pause; exit 1; }
+
+normal=$(id -un)
+suggested="${normal}-lab"
+
+cat <<EOF
+Sovel Private Workspace setup
+=============================
+Private Mode is a separate Linux account with an encrypted home. It has its
+own password and its own sign-in screen. Locking it always returns you to
+this desktop.
+
+Your everyday (Normal) account: $normal
+EOF
+
+if [ -e /etc/sovel/private.conf ]; then
+    printf '\nPrivate Workspace is already set up. Press Super+Shift+P to open it.\n'
+    pause; exit 0
+fi
+
+command -v sudo >/dev/null 2>&1 || fail "sudo is not installed. Run 'sovel-private setup' from an administrator account."
+printf '\nSetup needs an administrator password.\n'
+sudo -v || fail "This account cannot use sudo. Sign in to an administrator account and run:
+  sudo sovel-private setup --user $suggested --normal-user $normal"
+
+printf '\nName for the private account [%s]: ' "$suggested"
+read -r private || private=""
+[ -n "$private" ] || private=$suggested
+
+printf '\nPreview of the changes (nothing is changed yet):\n\n'
+sudo /usr/bin/sovel-private setup --user "$private" --normal-user "$normal" --dry-run || fail "The preview failed. Nothing was changed."
+
+printf '\nCreate the Private Workspace now? [y/N] '
+read -r answer || answer=""
+case "$answer" in
+    y|Y|yes|YES) ;;
+    *) printf 'Nothing was changed.\n'; pause; exit 0 ;;
+esac
+
+printf '\n'
+sudo /usr/bin/sovel-private setup --user "$private" --normal-user "$normal" || fail "Setup did not finish. Run 'sudo sovel-private status' to see what was created."
+
+printf '\nMoving your JARED data into the encrypted account.\nEnter the private password if asked.\n\n'
+sudo /usr/bin/sovel-private migrate-jared --from "$normal" || printf 'JARED data was not moved. You can retry later with:\n  sudo sovel-private migrate-jared --from %s\n' "$normal"
+
+# Refresh this desktop's keyboard shortcuts so Super+Shift+P opens the new workspace.
+printf '{}' | /usr/bin/python3 -I /usr/libexec/sovel-settings-helper apply-preferences >/dev/null 2>&1 || true
+
+cat <<EOF
+
+Done.
+  1. Sign out and back in once. JARED then moves to Private Mode.
+  2. Press Super+Shift+P (or Sovel menu → Open Private Workspace).
+  3. Sign in with the private password you just chose.
+Keep the recovery key that was shown above somewhere offline.
+EOF
+pause

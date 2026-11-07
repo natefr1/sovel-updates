@@ -27,6 +27,7 @@ class Backend : public QObject {
     Q_PROPERTY(QString mode READ mode CONSTANT)
     Q_PROPERTY(bool privateMode READ privateMode CONSTANT)
     Q_PROPERTY(bool privateConfigured READ privateConfigured CONSTANT)
+    Q_PROPERTY(bool assistantAvailable READ assistantAvailable CONSTANT)
     Q_PROPERTY(QVariantMap vault READ vault NOTIFY vaultChanged)
     Q_PROPERTY(bool vaultBusy READ vaultBusy NOTIFY vaultChanged)
 public:
@@ -80,6 +81,7 @@ public:
     QString mode()const;
     bool privateMode()const;
     bool privateConfigured()const;
+    bool assistantAvailable()const;
     // The greeter leaves the private VT through logind; polkit allows this for the active seat session.
     Q_INVOKABLE bool switchToNormalDesktop();
     QVariantMap vault()const{return m_vault;}

@@ -41,6 +41,14 @@ static void boundProcessLifetime(QProcess *process,int milliseconds=10000){
 }
 
 Backend::Backend(QObject *parent):QObject(parent),m_settings("Sovel","Desktop") {
+    // First start of Dual Environment in Normal Mode: an account upgraded from
+    // 0.1.0-9 still carries its old violet wallpaper, photo or live wallpaper.
+    // Start Normal Mode on the city once; the person can choose again afterwards.
+    if(!SovelMode::isPrivate()&&!m_settings.value("appearance/normalCity",false).toBool()){
+        m_settings.remove("appearance/photo");m_settings.setValue("appearance/external",false);
+        m_settings.setValue("appearance/wallpaper","city");m_settings.setValue("appearance/normalCity",true);m_settings.sync();
+        QProcess::startDetached("/usr/libexec/sovel-wallpaper-stop",{});
+    }
     connect(&m_timer,&QTimer::timeout,this,&Backend::sample);
     m_timer.start(2000); sample();
 }
@@ -55,13 +63,17 @@ QString Backend::wallpaper() const {
     const auto fallback=SovelMode::isPrivate()?QStringLiteral("emblem"):QStringLiteral("city");
     const auto value=m_settings.value("appearance/wallpaper",fallback).toString();
     static const QStringList known{"city","emblem","lab","landscape","lockroom"};
-    // Earlier releases defaulted to "landscape"; an untouched value follows the mode.
-    if(!known.contains(value)||(value=="landscape"&&!m_settings.value("appearance/wallpaperChosen",false).toBool()))return fallback;
+    // The violet artwork belongs to Private Mode, including the purple landscape
+    // that 0.1.0-9 and earlier used by default.
+    static const QStringList privateOnly{"emblem","lab","landscape"};
+    if(!known.contains(value)||(!SovelMode::isPrivate()&&privateOnly.contains(value)))return fallback;
+    if(value=="landscape"&&!m_settings.value("appearance/wallpaperChosen",false).toBool())return fallback;
     return value;
 }
 QString Backend::mode()const{return SovelMode::name();}
 bool Backend::privateMode()const{return SovelMode::isPrivate();}
 bool Backend::privateConfigured()const{return SovelMode::configured();}
+bool Backend::assistantAvailable()const{return SovelMode::assistantAvailable();}
 bool Backend::switchToNormalDesktop(){
     if(!SovelMode::configured())return false;
     auto call=QDBusMessage::createMethodCall("org.freedesktop.login1","/org/freedesktop/login1/seat/self","org.freedesktop.login1.Seat","SwitchTo");
@@ -277,6 +289,19 @@ void Backend::launch(const QString &app){
         if(!launchManaged(QCoreApplication::applicationFilePath(),{"--downloads"}))message("Could not open Downloads.");
         return;
     }
+    if(app=="enter-private"){
+        // Normal Mode's way in. Before setup it opens the setup page instead.
+        if(SovelMode::isPrivate())return;
+        if(!SovelMode::configured()){
+            if(!launchManaged(QCoreApplication::applicationFilePath(),{"--app","settings","--settings-page","private"}))message("Could not open Settings.");
+            return;
+        }
+        auto *entry=new QProcess(this);
+        connect(entry,&QProcess::errorOccurred,this,[this,entry](QProcess::ProcessError error){if(error==QProcess::FailedToStart){message("The Private Workspace service is unavailable.");entry->deleteLater();}});
+        connect(entry,qOverload<int,QProcess::ExitStatus>(&QProcess::finished),entry,&QObject::deleteLater);
+        entry->start("/usr/bin/sovel-mode",{"enter-private"});
+        return;
+    }
     if(app=="updates"||app=="sound-settings"||app=="display-settings"){
         const auto page=app=="updates"?"updates":app=="sound-settings"?"sound":"displays";
         if(!launchManaged(QCoreApplication::applicationFilePath(),{"--app","settings","--settings-page",page}))message("Could not open Settings.");
@@ -317,7 +342,8 @@ void Backend::launch(const QString &app){
 QStringList Backend::dockIds()const{
     if(m_settings.contains("dock/order"))return m_settings.value("dock/order").toStringList();
     auto ids=QStringList{"sovel:files","sovel:terminal","sovel:settings","sovel:store"};
-    if(SovelMode::isPrivate())ids<<"sovel:jared"<<"sovel:vault";
+    if(SovelMode::assistantAvailable())ids<<"sovel:jared";
+    if(SovelMode::isPrivate())ids<<"sovel:vault";
     for(const auto &id:m_settings.value("dock/pins").toStringList())if(!ids.contains(id))ids<<id;
     return ids;
 }
@@ -348,7 +374,7 @@ void Backend::movePinned(const QString &id,int direction){
     const auto target=qBound(0,int(index)+(direction<0?-1:1),int(ids.size())-1);ids.move(index,target);setDockOrder(ids);
 }
 void Backend::launchJared(const QString &prompt){
-    if(!SovelMode::isPrivate()){message("This app is not available.");return;}
+    if(!SovelMode::assistantAvailable()){message("JARED is in your Private Workspace. Press Super+Shift+P to open it.");return;}
     if(!launchManaged(QCoreApplication::applicationFilePath(),{"--app","jared","--jared-prompt",prompt.left(2000)}))message("JARED could not be opened.");
 }
 QVariantList Backend::applications(bool refresh) const {
@@ -356,7 +382,8 @@ QVariantList Backend::applications(bool refresh) const {
     if(!refresh&&m_applicationCacheTime&&now-m_applicationCacheTime<2000)return m_applicationCache;
     QVariantList result;
     QStringList builtIn{"files","settings","store","terminal"};
-    if(SovelMode::isPrivate())builtIn<<"jared"<<"vault";
+    if(SovelMode::assistantAvailable())builtIn<<"jared";
+    if(SovelMode::isPrivate())builtIn<<"vault";
     for(const auto &id:builtIn){
         QString name=id;name[0]=name[0].toUpper();if(id=="jared")name="JARED";
         result.append(QVariantMap{{"id","sovel:"+id},{"name",name},{"icon","qrc:/assets/icons/"+id+".svg"},{"appIds",QStringList{id=="terminal"?"foot":"sovel-"+id}}});

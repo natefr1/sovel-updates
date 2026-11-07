@@ -51,13 +51,13 @@ void dbus(QObject *owner,const QString &service,const QString &path,const QStrin
 Workspace::Workspace(Backend *backend,SettingsService *settings,bool desktop,QObject *parent):QObject(parent),m_backend(backend),m_settings(settings),m_desktop(desktop),m_network(this){
  QFile catalog(":/assets/widget-catalog.json");
  if(catalog.open(QIODevice::ReadOnly))for(const auto &entry:QJsonDocument::fromJson(catalog.readAll()).array().toVariantList()){
-  // Private widget types (JARED, projects, AI monitor) do not exist in Normal Mode.
-  const auto modes=entry.toMap().value("modes").toStringList();if(modes.isEmpty()||modes.contains(SovelMode::name()))m_registry<<entry;}
+  // JARED widget types (JARED, projects, AI monitor) exist only where JARED is.
+  if(SovelMode::allowedIn(entry.toMap().value("modes").toStringList()))m_registry<<entry;}
  m_file=QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation)+"/Sovel/Workspace.json";reload();
  if(!QFile::exists(m_file)){
-  const auto middle=SovelMode::isPrivate()?QVariantMap{{"type","jared"},{"x",.98},{"y",.40}}:QVariantMap{{"type","calendar"},{"x",.98},{"y",.40}};
+  const auto middle=SovelMode::assistantAvailable()?QVariantMap{{"type","jared"},{"x",.98},{"y",.40}}:QVariantMap{{"type","calendar"},{"x",.98},{"y",.40}};
   auto legacy=backend->widgets();if(legacy.isEmpty())legacy={QVariantMap{{"type","clock"},{"x",.98},{"y",.12}},middle,QVariantMap{{"type","system"},{"x",.98},{"y",.74}}};
-  if(!SovelMode::isPrivate())legacy.erase(std::remove_if(legacy.begin(),legacy.end(),[this](const QVariant &w){return !knownType(w.toMap().value("type").toString());}),legacy.end());
+  if(!SovelMode::assistantAvailable())legacy.erase(std::remove_if(legacy.begin(),legacy.end(),[this](const QVariant &w){return !knownType(w.toMap().value("type").toString());}),legacy.end());
   m_extra["legacyLayout"]=legacy;m_dirty.insert("legacyLayout");
   for(int i=0;i<legacy.size();i++){auto widget=legacy[i].toMap();widget["size"]=widget.value("type")=="system"?"medium":"small";widget["x"]=i%2?.02:.98;widget["y"]=i<2?.10:.68;legacy[i]=widget;}
   saveLayout(legacy);
@@ -81,7 +81,7 @@ QString Workspace::assistantStatePath()
 }
 void Workspace::readAssistantState()
 {
- if(!SovelMode::isPrivate())return;
+ if(!SovelMode::assistantAvailable())return;
  auto state=jsonFile(assistantStatePath());
 #ifdef Q_OS_LINUX
  const auto pid=state.value("pid").toLongLong();
@@ -92,7 +92,7 @@ void Workspace::readAssistantState()
 void Workspace::assistantCommand(const QString &action,const QString &text)
 {
  static const QStringList allowed{"connect","ask","voice-start","voice-stop","clear-transcript","approve","reject","choose-output","cancel","show","preferences","unload","load-workspaces","project-summary","project-task","project-open-file"};
- if(!m_desktop||!SovelMode::isPrivate()||!allowed.contains(action)||text.size()>2000)return;
+ if(!m_desktop||!SovelMode::assistantAvailable()||!allowed.contains(action)||text.size()>2000)return;
  const auto endpoint=QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation)+"/sovel-jared.sock";
  auto *socket=new QLocalSocket(this);
  const auto request=QJsonDocument(QJsonObject{{"action",action},{"text",text}}).toJson(QJsonDocument::Compact)+"\n";

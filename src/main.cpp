@@ -87,7 +87,8 @@ int main(int argc,char **argv){
     }
     // JARED and the Vault exist only in the private account. This is checked
     // against real group membership, so no flag or variable can bypass it.
-    if((mode=="jared"||jaredService||mode=="vault")&&!SovelMode::isPrivate()){
+    // Before Private Mode is set up, JARED stays available in Normal Mode.
+    if(((mode=="jared"||jaredService)&&!SovelMode::assistantAvailable())||(mode=="vault"&&!SovelMode::isPrivate())){
         std::fprintf(stderr,"Sovel: this app is available only in the private workspace.\n");
         return 3;
     }

@@ -1,6 +1,7 @@
 #include "workspace.h"
 #include "backend.h"
 #include "settingsservice.h"
+#include "sovelmode.h"
 #include <QtTest>
 #include <QTemporaryDir>
 #include <QFile>
@@ -10,7 +11,7 @@ class WorkspaceTests:public QObject {
  Q_OBJECT
  QTemporaryDir temporary;
 private slots:
- void initTestCase(){qputenv("XDG_CONFIG_HOME",temporary.path().toUtf8());qputenv("XDG_DATA_HOME",(temporary.path()+"/data").toUtf8());}
+ void initTestCase(){SovelMode::setForTesting(false);SovelMode::setAssistantForTesting(false);qputenv("XDG_CONFIG_HOME",temporary.path().toUtf8());qputenv("XDG_DATA_HOME",(temporary.path()+"/data").toUtf8());}
  void layoutValidationPersistenceAndEmptyState(){
   Backend backend;SettingsService settings(nullptr,false);
   {Workspace workspace(&backend,&settings,false);QCOMPARE(workspace.registry().size(),23); // Normal Mode: JARED, projects and AI monitor widgets are private-onlyQVERIFY(workspace.addWidget("unknown").isEmpty());

@@ -46,6 +46,7 @@ Item {
                 ShellMenuItem { text: "App Library…"; onTriggered: System.launch("library") }
                 ShellMenuItem { text: "Store…"; onTriggered: System.launch("store") }
                 ShellMenuItem { text: "Vault…"; visible: System.privateMode; onTriggered: System.launch("vault") }
+                ShellMenuItem { text: System.privateConfigured ? "Open Private Workspace…" : "Set Up Private Workspace…"; visible: !System.privateMode; onTriggered: System.launch("enter-private") }
                 MenuSeparator {}
                 ShellMenuItem { text: System.privateMode ? "Lock Computer" : "Lock Screen"; onTriggered: System.launch("lock") }
                 ShellMenuItem { text: "Exit Private Workspace…"; visible: System.privateMode; onTriggered: System.launch("exit-private") }
@@ -81,7 +82,7 @@ Item {
     readonly property var preferences:SettingsService.preferences
     readonly property var assistant:Workspace.assistant||({})
     // JARED exists only in Private Mode; there the bar also ends with a security lock.
-    readonly property var order:String(preferences["bar.order"]||"network,bluetooth,sound,battery,notifications,updates,jared,search,control,calendar").split(",").concat(["downloads"]).concat(System.privateMode?["lock"]:[]).filter((key,index,all)=>["network","bluetooth","sound","battery","notifications","updates","search","control","calendar","downloads"].concat(System.privateMode?["jared","lock"]:[]).includes(key)&&all.indexOf(key)===index)
+    readonly property var order:String(preferences["bar.order"]||"network,bluetooth,sound,battery,notifications,updates,jared,search,control,calendar").split(",").concat(["downloads"]).concat(System.privateMode?["lock"]:[]).filter((key,index,all)=>["network","bluetooth","sound","battery","notifications","updates","search","control","calendar","downloads"].concat(System.assistantAvailable?["jared"]:[]).concat(System.privateMode?["lock"]:[]).includes(key)&&all.indexOf(key)===index)
     property real popupX:width-400
     function positionPopup(button){popupX=Math.max(8,Math.min(width-380,button.mapToItem(root,0,0).x))}
     function battery(){return (Workspace.telemetry.batteries||[])[0]||({})}

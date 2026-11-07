@@ -1,15 +1,14 @@
 {
-  "version": "0.1.0-10",
-  "name": "Dual Environment",
-  "type": "Feature update",
+  "version": "0.1.0-11",
+  "name": "Private Access",
+  "type": "Fix update",
   "icon": "sovel-vault",
   "channel": "public",
   "notes": [
-    "Normal Mode is an ordinary city desktop; Private Mode is a separate encrypted account with JARED and your engineering workspace.",
-    "Private storage is a LUKS2 home encrypted with AES-256-XTS, unlocked only by its own password and sealed when you exit.",
-    "Every lock covers all displays first and returns to the same city lock screen. Unlocking it opens Normal Mode.",
-    "Automatic locking after inactivity, before sleep and when the lid closes. Private Mode can seal itself while locked.",
-    "The Vault adds a second AES-256-GCM encrypted folder with its own passphrase inside Private Mode.",
-    "Private Mode turns your secondary display into a configurable command center."
+    "JARED is back on your desktop until you set up Private Mode, then it moves into the encrypted workspace.",
+    "Sovel menu → Set Up Private Workspace opens a guided setup. Afterwards the same item, or Super+Shift+P, opens Private Mode.",
+    "Normal Mode starts on the city wallpaper. The violet landscape, spider emblem and laboratory now belong to Private Mode.",
+    "Super+Shift+P explains what is wrong instead of doing nothing, and never locks for a private sign-in that is not running.",
+    "The isolation check and private audit log open from Settings again. New command: sovel-mode doctor."
   ]
 }

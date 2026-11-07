@@ -4,7 +4,7 @@ import configparser,datetime,json,os,pwd,re,shutil,subprocess,sys,xml.etree.Elem
 from pathlib import Path
 
 PAGES=set('home appearance wallpaper desktop menubar widgets displays sound devices input printers network sharing notifications apps power storage users language datetime accessibility gaming screentime privacy private jared backup updates developer about'.split())
-PRIVATE_PAGES={'private','jared'}
+ASSISTANT_PAGES={'jared'}
 PRIVATE_CONFIG=Path('/etc/sovel/private.conf')
 PRIVATE_SHORTCUTS={'W-S-p','W-A-p','C-A-p'}
 def private_mode():
@@ -12,11 +12,15 @@ def private_mode():
  try:gid=grp.getgrnam('sovel-private').gr_gid
  except KeyError:return False
  return gid==os.getgid() or gid in os.getgroups()
+def assistant_available():
+ """JARED lives in Private Mode; before Private Mode is set up it stays in Normal Mode."""
+ return private_mode() or not PRIVATE_CONFIG.exists()
 def private_shortcut():
  parser=configparser.ConfigParser(interpolation=None)
  try:
   with PRIVATE_CONFIG.open(encoding='utf-8') as handle:parser.read_file(handle)
   value=parser['private'].get('shortcut','W-S-p')
+ except FileNotFoundError:return 'W-S-p'  # Not set up yet: the shortcut opens setup.
  except (OSError,KeyError,configparser.Error):return ''
  return value if value in PRIVATE_SHORTCUTS else ''
 CONFIG=Path(os.environ.get('XDG_CONFIG_HOME',Path.home()/'.config'))/'Sovel'
@@ -73,7 +77,7 @@ def storage():
  data=json.loads(command(['lsblk','--json','--bytes','--output','NAME,TYPE,FSTYPE,SIZE,MOUNTPOINTS,LABEL,MODEL,TRAN,RM']))
  return flatten_devices(data.get('blockdevices',[]))
 def report(page):
- if page not in PAGES or (page in PRIVATE_PAGES and not private_mode()):raise ValueError('Unknown Settings page.')
+ if page not in PAGES or (page in ASSISTANT_PAGES and not assistant_available()):raise ValueError('Unknown Settings page.')
  rows=[];data={};caps=capabilities()
  if page=='private':
   try:status=json.loads(command(['/usr/bin/sovel-private','status','--json'],timeout=15) or '{}')
@@ -82,7 +86,9 @@ def report(page):
   except ValueError:vault={}
   labels={'ok':'✓','warn':'!','fail':'✕','info':'·'}
   rows=[row(labels.get(c.get('status'),'·')+' '+c.get('label',''),c.get('detail','')) for c in status.get('checks',[])]
-  rows.append(row('Vault','Open at ~/Vault' if vault.get('mounted') else 'Closed and encrypted' if vault.get('initialized') else 'Not created'))
+  if private_mode():rows.append(row('Vault','Open at ~/Vault' if vault.get('mounted') else 'Closed and encrypted' if vault.get('initialized') else 'Not created'))
+  elif status.get('configured'):rows.insert(0,row('✓ Set up','Press Super+Shift+P to open it.'))
+  else:rows=[row('· Not set up yet','Choose Set up Private Workspace below. JARED stays on this desktop until then.')]
   data['vault']=vault;data['isolation']=status.get('checks',[])
   return {'rows':rows,'capabilities':caps,**data}
  if page in ('home','about'):
@@ -194,7 +200,7 @@ def apply_preferences():
   if bind.tag!='keybind':continue
   action=bind.find('action');run=(action.get('command','') if action is not None else '')
   # JARED and Private entry exist only where they belong.
-  if (not private_mode() and 'sovel --app jared' in run) or 'sovel-mode enter-private' in run:keyboard.remove(bind)
+  if (not assistant_available() and 'sovel --app jared' in run) or 'sovel-mode enter-private' in run:keyboard.remove(bind)
  shortcut=private_shortcut()
  if shortcut and not private_mode():
   bind=ET.SubElement(keyboard,'keybind',{'key':shortcut});ET.SubElement(bind,'action',{'name':'Execute','command':'/usr/bin/sovel-mode enter-private'})
@@ -300,8 +306,11 @@ def user_action(operation,payload):
   if value not in command(['locale','-a']).splitlines() or not re.fullmatch(r'[A-Za-z0-9_.@-]{1,80}',value):raise ValueError('Choose an installed locale.')
   folder=CONFIG.parent/'environment.d';folder.mkdir(parents=True,exist_ok=True);(folder/'50-sovel-language.conf').write_text('LANG='+value+'\n',encoding='utf-8');return {'message':'Language preference saved. Sign out and back in to apply it to new applications.'}
  if operation=='account-security':return launch(['foot'],['--','passwd'])
+ if operation=='private-setup':
+  if private_mode():raise ValueError('Private Workspace is already set up.')
+  return launch(['foot'],['--title','Set up Private Workspace','--','/usr/libexec/sovel-private-setup'])
  if operation in ('private-audit','isolation-check'):
-  if not private_mode():raise ValueError('This settings action is not integrated yet.')
+  if operation=='private-audit' and not private_mode():raise ValueError('The audit log exists only in the private workspace.')
   if operation=='private-audit':
    events=json.loads(command(['/usr/bin/sovel-mode','audit'],check=True) or '{}').get('events',[])
    return {'message':'Recent private workspace events. No file names, window titles or conversations are recorded.','rows':[row(e.get('time',''),e.get('event','')) for e in reversed(events[-60:])] or [row('Events','None recorded yet')]}

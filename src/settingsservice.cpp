@@ -26,8 +26,7 @@ SettingsService::SettingsService(QObject *parent,bool applyUserChanges):QObject(
  QFile schema(":/assets/settings-pages.json");if(schema.open(QIODevice::ReadOnly)){auto root=QJsonDocument::fromJson(schema.readAll()).object();m_pages=root["pages"].toArray().toVariantList();m_definitions=root["preferences"].toObject().toVariantMap();}
  // Pages, items and preferences tagged with "modes" exist only in those modes.
  // Normal Mode never receives private page definitions, even through search.
- const auto mode=SovelMode::name();
- const auto allowed=[&mode](const QVariantMap &entry){const auto modes=entry.value("modes").toStringList();return modes.isEmpty()||modes.contains(mode);};
+ const auto allowed=[](const QVariantMap &entry){return SovelMode::allowedIn(entry.value("modes").toStringList());};
  QVariantList visible;
  for(const auto &value:m_pages){auto page=value.toMap();if(!allowed(page))continue;QVariantList sections;
   for(const auto &sectionValue:page.value("sections").toList()){auto section=sectionValue.toMap();if(!allowed(section))continue;QVariantList items;
@@ -124,7 +123,7 @@ void SettingsService::refresh(const QString &page,bool force){
 }
 void SettingsService::perform(const QString &operation,const QVariantMap &payload){
  static const QSet<QString> admin={"set-hostname","set-timezone","set-ntp","set-full-name","firewall-status","set-firewall"};
- static const QSet<QString> user={"display-config","identify-displays","input-config","printers","scanner","network-config","localsend","kdeconnect","notification-history","clear-notifications","default-apps","set-default-app","startup-items","set-startup","disks","disk-usage","trash","account-security","sessions","choose-locale","set-locale","fonts","screen-reader","on-screen-keyboard","resources","steam","heroic","bottles","screenshot","flatseal","backup-tool","logs","licenses","terminal","apply-preferences","sleep-inhibitors","ssh-review"};
+ static const QSet<QString> user={"display-config","identify-displays","input-config","printers","scanner","network-config","localsend","kdeconnect","notification-history","clear-notifications","default-apps","set-default-app","startup-items","set-startup","disks","disk-usage","trash","account-security","sessions","choose-locale","set-locale","fonts","screen-reader","on-screen-keyboard","resources","steam","heroic","bottles","screenshot","flatseal","backup-tool","logs","licenses","terminal","apply-preferences","sleep-inhibitors","ssh-review","isolation-check","private-audit","private-setup"};
  if(!admin.contains(operation)&&!user.contains(operation)){m_status="This action is not available in the settings service.";emit statusChanged();emit actionFinished(operation,false,{{"error",m_status}});return;}
  run(operation,payload,admin.contains(operation),[this,operation](bool ok,const QVariantMap &result){m_status=result.value(ok?"message":"error",ok?"Operation completed.":"The change was not applied.").toString();emit statusChanged();emit actionFinished(operation,ok,result);if(ok)m_refreshed.clear();});
 }

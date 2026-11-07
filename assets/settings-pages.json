@@ -377,7 +377,7 @@
               "type": "preference",
               "key": "bar.show.jared",
               "modes": [
-                "private"
+                "assistant"
               ]
             },
             {
@@ -1458,9 +1458,6 @@
       "sections": [
         {
           "title": "Private workspace",
-          "modes": [
-            "private"
-          ],
           "items": [
             {
               "type": "link",
@@ -1532,7 +1529,7 @@
               "target": "jared",
               "detail": "",
               "modes": [
-                "private"
+                "assistant"
               ]
             },
             {
@@ -1551,11 +1548,55 @@
       "name": "Private Workspace",
       "group": "Privacy",
       "icon": "privacy",
-      "modes": [
-        "private"
-      ],
-      "description": "Your separate, encrypted laboratory account.",
+      "description": "A separate, encrypted laboratory account with JARED.",
       "sections": [
+        {
+          "title": "Open",
+          "modes": [
+            "normal"
+          ],
+          "items": [
+            {
+              "type": "info",
+              "label": "How to get in",
+              "detail": "Press Super+Shift+P, or choose Open Private Workspace from the Sovel menu. This desktop locks first, then the private sign-in appears. Enter the private password to open it. Locking the private workspace always brings you back here."
+            },
+            {
+              "type": "action",
+              "label": "Open Private Workspace",
+              "operation": "enter-private",
+              "detail": "Locks this desktop and switches to the private sign-in. If Private Workspace is not set up yet, this page stays open.",
+              "capability": ""
+            }
+          ]
+        },
+        {
+          "title": "Set up",
+          "modes": [
+            "normal"
+          ],
+          "items": [
+            {
+              "type": "info",
+              "label": "One-time setup",
+              "detail": "Setup creates a separate encrypted account (for example nate-lab) with its own password and a recovery key, and a private sign-in screen on its own display terminal. It needs an administrator password and takes a few minutes. Until setup is done, JARED stays on this desktop."
+            },
+            {
+              "type": "action",
+              "label": "Set up Private Workspace",
+              "operation": "private-setup",
+              "detail": "Opens a terminal that previews every change, asks before making it, creates the account and then moves your JARED data into it.",
+              "capability": ""
+            },
+            {
+              "type": "action",
+              "label": "Run isolation check",
+              "operation": "isolation-check",
+              "detail": "Checks encryption, swap, hibernation, remote login and whether this account can read the private workspace as an administrator.",
+              "capability": ""
+            }
+          ]
+        },
         {
           "title": "Protection",
           "items": [
@@ -1571,6 +1612,9 @@
               "detail": "Checks encryption, swap, hibernation, crash dumps, remote login and Normal account privileges.",
               "capability": ""
             }
+          ],
+          "modes": [
+            "private"
           ]
         },
         {
@@ -1604,6 +1648,9 @@
               "detail": "Closes private windows, seals the Vault and the encrypted home, and returns to Normal Mode.",
               "capability": ""
             }
+          ],
+          "modes": [
+            "private"
           ]
         },
         {
@@ -1616,6 +1663,9 @@
               "detail": "A second encrypted folder (AES-256-GCM) with its own passphrase. It closes when idle and whenever Sovel locks.",
               "capability": ""
             }
+          ],
+          "modes": [
+            "private"
           ]
         },
         {
@@ -1647,6 +1697,9 @@
               "detail": "Notes, tasks, calendar, events and world clocks",
               "capability": ""
             }
+          ],
+          "modes": [
+            "private"
           ]
         },
         {
@@ -1664,6 +1717,9 @@
               "label": "Recovery key and encrypted backups",
               "detail": "The recovery key shown during setup unlocks this account if the password is lost. With the workspace exited, run \"sudo sovel-private backup /path/to/drive\" from Normal Mode to copy the still-encrypted image."
             }
+          ],
+          "modes": [
+            "private"
           ]
         }
       ],
@@ -1725,7 +1781,7 @@
       ],
       "legacy": -1,
       "modes": [
-        "private"
+        "assistant"
       ]
     },
     {
@@ -2114,7 +2170,7 @@
       "kind": "switch",
       "default": true,
       "modes": [
-        "private"
+        "assistant"
       ]
     },
     "bar.show.calendar": {
@@ -2308,7 +2364,7 @@
       "alias": "jared/allowBasic",
       "sensitive": true,
       "modes": [
-        "private"
+        "assistant"
       ]
     },
     "jared.speak": {
@@ -2317,7 +2373,7 @@
       "default": false,
       "alias": "jared/speak",
       "modes": [
-        "private"
+        "assistant"
       ]
     },
     "jared.idle": {
@@ -2340,7 +2396,7 @@
       ],
       "alias": "jared/idle",
       "modes": [
-        "private"
+        "assistant"
       ]
     },
     "bar.order": {

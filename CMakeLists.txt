@@ -46,7 +46,7 @@ qt_add_resources(sovel ui PREFIX "/" FILES ${SOVEL_QML} ${SOVEL_ICONS} assets/la
 qt_add_shaders(sovel glass PREFIX "/" FILES shaders/glass.frag)
 install(TARGETS sovel RUNTIME DESTINATION bin)
 install(PROGRAMS packaging/sovel-setup-display packaging/sovel-session-services packaging/sovel-session-diagnostics DESTINATION libexec)
-install(PROGRAMS packaging/sovel-settings-helper packaging/sovel-settings-admin DESTINATION libexec)
+install(PROGRAMS packaging/sovel-settings-helper packaging/sovel-settings-admin packaging/sovel-private-setup DESTINATION libexec)
 install(PROGRAMS packaging/sovel-archive packaging/sovel-volumes packaging/sovel-displays packaging/sovel-jared-workspace packaging/sovel-transfer DESTINATION libexec)
 install(FILES packaging/org.sovel.settings.policy DESTINATION share/polkit-1/actions)
 install(FILES assets/settings-pages.json DESTINATION share/sovel)

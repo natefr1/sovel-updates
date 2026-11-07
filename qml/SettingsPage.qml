@@ -38,7 +38,7 @@ ColumnLayout {
   Image {Layout.fillWidth:true;Layout.preferredHeight:190;source:System.wallpaperUrl;fillMode:Image.PreserveAspectCrop;clip:true}
   RowLayout {SovelButton {text:"Choose image…";primary:true;onClicked:root.action("wallpaper-image")} SovelButton {text:"Wallpaper collection…";onClicked:System.openWallpaperPicker()}}
   Flow {Layout.fillWidth:true;spacing:9
-   Repeater {model:System.privateMode?[{key:"emblem",name:"Spider emblem"},{key:"lab",name:"Laboratory"},{key:"city",name:"City"}]:[{key:"city",name:"City"},{key:"landscape",name:"Sovel landscape"},{key:"lockroom",name:"Sovel room"}];SovelButton {required property var modelData;text:modelData.name;primary:System.wallpaper===modelData.key;onClicked:System.wallpaper=modelData.key}}
+   Repeater {model:System.privateMode?[{key:"emblem",name:"Spider emblem"},{key:"lab",name:"Laboratory"},{key:"landscape",name:"Violet landscape"},{key:"city",name:"City"}]:[{key:"city",name:"City"},{key:"lockroom",name:"Sovel room"}];SovelButton {required property var modelData;text:modelData.name;primary:System.wallpaper===modelData.key;onClicked:System.wallpaper=modelData.key}}
   }
  }}
  Component {id:updatesPanel;UpdatesPanel {}}

@@ -136,10 +136,44 @@ def system_bus_call(path, interface, method, signature, values):
     return bool(result and result.returncode == 0)
 
 
+def log(message):
+    """Content-free diagnostics in the journal: `journalctl -t sovel-mode`."""
+    if shutil.which('logger'):
+        quiet(['logger', '-t', 'sovel-mode', message])
+
+
+def active_vt():
+    try:
+        value = Path('/sys/class/tty/tty0/active').read_text(encoding='ascii').strip()
+    except OSError:
+        return None
+    return int(value[3:]) if value.startswith('tty') and value[3:].isdigit() else None
+
+
 def switch_vt(number):
-    """Ask logind to change VT; allowed for the active local session by polkit."""
-    return system_bus_call('/org/freedesktop/login1/seat/self', 'org.freedesktop.login1.Seat',
-                           'SwitchTo', '(u)', (number,))
+    """Ask logind to change VT, then confirm the VT really changed."""
+    if not system_bus_call('/org/freedesktop/login1/seat/self', 'org.freedesktop.login1.Seat',
+                           'SwitchTo', '(u)', (number,)):
+        log(f'logind refused SwitchTo {number}')
+        return False
+    current = None
+    for _ in range(20):
+        current = active_vt()
+        if current in (number, None):
+            return True
+        time.sleep(0.1)
+    log(f'SwitchTo {number} accepted but VT {current} is still active')
+    return False
+
+
+def greeter_state():
+    result = quiet(['systemctl', 'is-active', 'sovel-private-greetd.service'])
+    return (result.stdout.strip() if result and result.stdout else '') or 'unknown'
+
+
+def open_setup():
+    subprocess.Popen([SHELL, '--app', 'settings', '--settings-page', 'private'], stdin=subprocess.DEVNULL,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
 
 
 def locker_running():
@@ -244,12 +278,21 @@ def command_enter_private(_args):
         return 0
     settings = config()
     if not settings:
+        notify('Private Workspace is not set up', 'Opening Settings so you can set it up.')
+        open_setup()
         return 2
+    # Never lock this desktop for a sign-in screen that is not there.
+    state = greeter_state()
+    if state != 'active':
+        log(f'private greeter is {state}')
+        notify('Private sign-in is not running',
+               'Run "sudo systemctl restart sovel-private-greetd" and try again. This desktop was not locked.')
+        return 1
     if not lock_screen():
         notify('Lock failed', 'This desktop could not be locked, so the private workspace was not opened.')
         return 1
     if not switch_vt(settings['private_vt']):
-        notify('Could not switch', 'This desktop stays locked. Unlock it to continue.')
+        notify('Could not switch', 'This desktop stays locked. Unlock it, then run "sovel-mode doctor".')
         return 1
     return 0
 
@@ -401,6 +444,30 @@ def command_status(_args):
     return 0
 
 
+def command_doctor(_args):
+    """Explain why Private Mode can or cannot be reached. Prints no private content."""
+    settings = config()
+    lines = [f'mode: {"private" if private_mode() else "normal"} (user {os.environ.get("USER", "?")})',
+             f'configured: {"yes" if settings else "no (/etc/sovel/private.conf is missing; run Settings → Private Workspace → Set up)"}']
+    if settings:
+        lines += [f'private account: {settings["user"]}',
+                  f'terminals: Normal VT {settings["normal_vt"]}, Private VT {settings["private_vt"]}',
+                  f'private greeter service: {greeter_state()}']
+    lines.append(f'active VT: {active_vt()}')
+    sessions = quiet(['loginctl', 'list-sessions', '--no-legend'])
+    if sessions and sessions.stdout:
+        for line in sessions.stdout.splitlines():
+            identifier = line.split()[0] if line.split() else ''
+            info = quiet(['loginctl', 'show-session', identifier, '-p', 'Name', '-p', 'Class', '-p', 'VTNr', '-p', 'State', '--value'])
+            if info and info.stdout:
+                lines.append('session ' + identifier + ': ' + ' '.join(info.stdout.split()))
+    journal = quiet(['journalctl', '-t', 'sovel-mode', '-n', '10', '--no-pager', '-o', 'cat'])
+    if journal and journal.stdout.strip():
+        lines += ['recent sovel-mode messages:'] + ['  ' + line for line in journal.stdout.splitlines()]
+    print('\n'.join(lines))
+    return 0
+
+
 def command_audit(_args):
     if not private_mode():
         return 2
@@ -427,10 +494,12 @@ def main():
     commands.add_parser('session-start', help=argparse.SUPPRESS)
     commands.add_parser('status')
     commands.add_parser('audit', help='Private authentication and locking events')
+    commands.add_parser('doctor', help='Explain whether Private Mode can be reached from here')
     args = parser.parse_args()
     handlers = {'lock': command_lock, 'enter-private': command_enter_private, 'exit-private': command_exit_private,
                 'seal-when-locked': command_seal_when_locked, 'watch': command_watch, 'idle': command_idle,
-                'session-start': command_session_start, 'status': command_status, 'audit': command_audit}
+                'session-start': command_session_start, 'status': command_status, 'audit': command_audit,
+                'doctor': command_doctor}
     return handlers[args.command](args)
 
 

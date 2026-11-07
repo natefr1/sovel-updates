@@ -28,7 +28,7 @@ Item {
   if(operation==="wallpaper-image"){photoPicker.open();return}
   if(operation==="wallpaper-picker"){System.openWallpaperPicker();return}
   if(operation==="lock"){System.launch("lock");return}
-  if(["files","library","store","jared","terminal","vault","exit-private"].includes(operation)){System.launch(operation);return}
+  if(["files","library","store","jared","terminal","vault","exit-private","enter-private"].includes(operation)){System.launch(operation);return}
   if(operation.startsWith("preset-")){
    const outputs=(typeof Displays!=="undefined"&&Displays?Displays.outputs:[]).filter(o=>o.enabled!==false).map(o=>o.name)
    const ok=Workspace.applyPreset(operation.slice(7),outputs,typeof Displays!=="undefined"&&Displays?Displays.primary:"")

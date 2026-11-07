@@ -5,6 +5,7 @@
 #include <QFile>
 #include <QSettings>
 #include <QString>
+#include <QStringList>
 #include <grp.h>
 #include <unistd.h>
 #include <vector>
@@ -34,6 +35,21 @@ inline bool isPrivate(){
 }
 inline QString name(){return isPrivate()?QStringLiteral("private"):QStringLiteral("normal");}
 inline bool configured(){return QFile::exists(QString::fromLatin1(configPath));}
+// JARED lives in Private Mode. Until Private Mode is set up on this computer it
+// stays in Normal Mode, so upgrading never leaves the person without JARED.
+// Decided once per process: setup takes effect at the next sign-in.
+inline int &assistantOverride(){static int value=-1;return value;}
+inline void setAssistantForTesting(bool available){assistantOverride()=available?1:0;}
+inline bool assistantAvailable(){
+    if(assistantOverride()>=0)return assistantOverride()==1;
+    if(isPrivate())return true;
+    static const bool beforeSetup=!configured();
+    return beforeSetup;
+}
+// Entries tagged "modes" exist only in those modes; "assistant" means wherever JARED is.
+inline bool allowedIn(const QStringList &modes){
+    return modes.isEmpty()||modes.contains(name())||(modes.contains(QStringLiteral("assistant"))&&assistantAvailable());
+}
 inline int terminal(const char *key,int fallback){
     QSettings settings(QString::fromLatin1(configPath),QSettings::IniFormat);
     bool ok=false;const int value=settings.value(QStringLiteral("private/")+QLatin1String(key),fallback).toInt(&ok);
