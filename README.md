@@ -1,5 +1,7 @@
 # Sovel public updates
 
+Desktop update `0.1.0-11` **Private Access** adds a visible way into Private Mode from the Sovel menu, Settings and Super+Shift+P, keeps JARED available until Private Mode is set up, and starts Normal Mode on the city wallpaper. See the [Private Access release notes](releases/0.1.0-11.md).
+
 Desktop update `0.1.0-10` **Dual Environment** separates the everyday city desktop from an encrypted Private Workspace with JARED and Vault. See the [Dual Environment release notes](releases/0.1.0-10.md).
 
 Desktop update `0.1.0-9` **Workspace** adds multi-display controls, Sovel Files improvements and

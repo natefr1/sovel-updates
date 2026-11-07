@@ -17,6 +17,24 @@ SHA256: 7ae6d3ab96c1e6ae3cbcf7bdb87eb57fd2ba97831ff4634a56056187a2e8e589
 SHA512: 37be3de57b6bc3ecc35a56353343f11c455af209b4352b0ac515fd2282f35b45130f701729930b1adf221bbd282776020e828d0a0c7a9c1b32b2d823f345d5c4
 
 Package: sovel-desktop
+X-Sovel-Release-Info: eyJ2ZXJzaW9uIjogIjAuMS4wLTExIiwgIm5hbWUiOiAiUHJpdmF0ZSBBY2Nlc3MiLCAidHlwZSI6ICJGaXggdXBkYXRlIiwgImljb24iOiAic292ZWwtdmF1bHQiLCAiY2hhbm5lbCI6ICJwdWJsaWMiLCAibm90ZXMiOiBbIkpBUkVEIGlzIGJhY2sgb24geW91ciBkZXNrdG9wIHVudGlsIHlvdSBzZXQgdXAgUHJpdmF0ZSBNb2RlLCB0aGVuIGl0IG1vdmVzIGludG8gdGhlIGVuY3J5cHRlZCB3b3Jrc3BhY2UuIiwgIlNvdmVsIG1lbnUg4oaSIFNldCBVcCBQcml2YXRlIFdvcmtzcGFjZSBvcGVucyBhIGd1aWRlZCBzZXR1cC4gQWZ0ZXJ3YXJkcyB0aGUgc2FtZSBpdGVtLCBvciBTdXBlcitTaGlmdCtQLCBvcGVucyBQcml2YXRlIE1vZGUuIiwgIk5vcm1hbCBNb2RlIHN0YXJ0cyBvbiB0aGUgY2l0eSB3YWxscGFwZXIuIFRoZSB2aW9sZXQgbGFuZHNjYXBlLCBzcGlkZXIgZW1ibGVtIGFuZCBsYWJvcmF0b3J5IG5vdyBiZWxvbmcgdG8gUHJpdmF0ZSBNb2RlLiIsICJTdXBlcitTaGlmdCtQIGV4cGxhaW5zIHdoYXQgaXMgd3JvbmcgaW5zdGVhZCBvZiBkb2luZyBub3RoaW5nLCBhbmQgbmV2ZXIgbG9ja3MgZm9yIGEgcHJpdmF0ZSBzaWduLWluIHRoYXQgaXMgbm90IHJ1bm5pbmcuIiwgIlRoZSBpc29sYXRpb24gY2hlY2sgYW5kIHByaXZhdGUgYXVkaXQgbG9nIG9wZW4gZnJvbSBTZXR0aW5ncyBhZ2Fpbi4gTmV3IGNvbW1hbmQ6IHNvdmVsLW1vZGUgZG9jdG9yLiJdLCAiYnVpbHRBdCI6ICIyMDI2LTExLTA3VDAxOjA2OjE5KzAwOjAwIn0K
+Version: 0.1.0-11
+Architecture: amd64
+Maintainer: Sovel Release Team
+Section: x11
+Priority: optional
+Installed-Size: 12768
+Depends: libc6 (>= 2.34), libgcc-s1 (>= 3.0), liblayershellqtinterface6 (>= 6.6.0), libpackagekitqt6-2 (>= 1.1.1), libqt6core6t64 (>= 6.10.2), libqt6dbus6 (>= 6.8.2), libqt6gui6 (>= 6.4.0), libqt6network6 (>= 6.7.2), libqt6qml6 (>= 6.6.0), libqt6quick6 (>= 6.6.0), libstdc++6 (>= 14), libwayland-client0 (>= 1.20.0), libarchive-tools, wlr-randr, udisks2, whisper.cpp, curl, python3-venv, qml6-module-qtquick-pdf, qml6-module-qtmultimedia, qml6-module-qt-labs-folderlistmodel, sovel-wallpaper-tools (>= 2.9+mpv1.9-1), sovel-aic8800-dkms (>= 1.0.0+git2e75f888-1), labwc, cage, greetd, gtklock, foot, resources, packagekit, network-manager, network-manager-applet, bluez, blueman, lxqt-policykit, xwayland, python3, flatpak, python3-gi, gir1.2-flatpak-1.0, ca-certificates, qml6-module-qtquick-dialogs, qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-window, qml6-module-qtqml-workerscript, qml6-module-qtquick-effects, qt6-wayland, qt6-svg-plugins, qt6-image-formats-plugins, coreutils, libglib2.0-bin, xdg-utils, xdg-user-dirs, grim, slurp, wl-clipboard, libnotify-bin, mako-notifier, pipewire, pipewire-pulse, pulseaudio-utils, wireplumber, xdg-desktop-portal, xdg-desktop-portal-wlr, xdg-desktop-portal-gtk, fonts-noto-core, fonts-noto-extra, fonts-noto-cjk, fonts-noto-color-emoji, fcitx5, fcitx5-frontend-qt6, fcitx5-frontend-gtk3, fcitx5-frontend-gtk4, fcitx5-mozc, fcitx5-chinese-addons, fcitx5-hangul, fcitx5-m17n, fcitx5-config-qt, llama.cpp-tools (>= 8681), espeak-ng, swayidle, gocryptfs, fuse3, systemd-homed
+Description: Sovel desktop, Settings and system integration
+ The public Sovel desktop with signed system updates in Settings.
+Filename: pool/main/s/sovel-desktop/sovel-desktop_0.1.0-11_amd64.deb
+Size: 7727906
+MD5sum: b040ebc857c17136930c5e8cb9615575
+SHA1: cf73083684277bb3abaaea6434b372305546067e
+SHA256: aedc669ebcb25167a854e6c5151b6d63624560d817bed230c2395136f292780b
+SHA512: b7281cdfacd80fe4ae90729fe94944024a6c53deda3933108d322a0026098170016bd720c2d7fec06207dd2322ae786fdafafc3f9706648248b15add1fc84afc
+
+Package: sovel-desktop
 X-Sovel-Release-Info: eyJ2ZXJzaW9uIjoiMC4xLjAtMTAiLCJuYW1lIjoiRHVhbCBFbnZpcm9ubWVudCIsInR5cGUiOiJGZWF0dXJlIHVwZGF0ZSIsImljb24iOiJzb3ZlbC12YXVsdCIsImNoYW5uZWwiOiJwdWJsaWMiLCJub3RlcyI6WyJOb3JtYWwgTW9kZSBpcyBhbiBvcmRpbmFyeSBjaXR5IGRlc2t0b3A7IFByaXZhdGUgTW9kZSBpcyBhIHNlcGFyYXRlIGVuY3J5cHRlZCBhY2NvdW50IHdpdGggSkFSRUQgYW5kIHlvdXIgZW5naW5lZXJpbmcgd29ya3NwYWNlLiIsIlByaXZhdGUgc3RvcmFnZSBpcyBhIExVS1MyIGhvbWUgZW5jcnlwdGVkIHdpdGggQUVTLTI1Ni1YVFMsIHVubG9ja2VkIG9ubHkgYnkgaXRzIG93biBwYXNzd29yZCBhbmQgc2VhbGVkIHdoZW4geW91IGV4aXQuIiwiRXZlcnkgbG9jayBjb3ZlcnMgYWxsIGRpc3BsYXlzIGZpcnN0IGFuZCByZXR1cm5zIHRvIHRoZSBzYW1lIGNpdHkgbG9jayBzY3JlZW4uIFVubG9ja2luZyBpdCBvcGVucyBOb3JtYWwgTW9kZS4iLCJBdXRvbWF0aWMgbG9ja2luZyBhZnRlciBpbmFjdGl2aXR5LCBiZWZvcmUgc2xlZXAgYW5kIHdoZW4gdGhlIGxpZCBjbG9zZXMuIFByaXZhdGUgTW9kZSBjYW4gc2VhbCBpdHNlbGYgd2hpbGUgbG9ja2VkLiIsIlRoZSBWYXVsdCBhZGRzIGEgc2Vjb25kIEFFUy0yNTYtR0NNIGVuY3J5cHRlZCBmb2xkZXIgd2l0aCBpdHMgb3duIHBhc3NwaHJhc2UgaW5zaWRlIFByaXZhdGUgTW9kZS4iLCJQcml2YXRlIE1vZGUgdHVybnMgeW91ciBzZWNvbmRhcnkgZGlzcGxheSBpbnRvIGEgY29uZmlndXJhYmxlIGNvbW1hbmQgY2VudGVyLiJdLCJidWlsdEF0IjoiMjAyNi0xMS0wNlQyMjo0NDo1MCswMDowMCIsInB1Ymxpc2hlZEF0IjoiMjAyNi0xMS0wNlQyMjo1NDo0NCswMDowMCJ9
 Version: 0.1.0-10
 Architecture: amd64
