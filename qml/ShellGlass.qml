@@ -4,7 +4,7 @@ Item {
  property real radius:18
  property real tint:0.50
  readonly property bool light:typeof SettingsService!=="undefined"&&!!SettingsService&&SettingsService.colors.light
- property bool lab:typeof System!=="undefined"&&!!System&&System.privateMode
+ property bool lab:typeof System!=="undefined"&&!!System&&!!System.privateMode
  readonly property bool simple:typeof System!=="undefined"&&!!System&&System.lowEffects
  // Current Labwc has no compositor blur. This is a lit translucent material:
  // never a copy of the wallpaper pretending to be the content behind it.

@@ -26,7 +26,7 @@ int main(int argc,char **argv){
  CHECK(entry.open(QIODevice::WriteOnly|QIODevice::Truncate));entry.write("[Desktop Entry]\nType=Application\nName=Spotify\nIcon=com.spotify.Client\nX-Flatpak=com.spotify.Client\n");entry.close();
  AppIcons refreshed;const auto spotify=refreshed.requestPixmap(QString::fromLatin1(QUrl::toPercentEncoding("desktop:"+desktop)),&result,QSize(32,32));CHECK(!spotify.isNull());CHECK(spotify.toImage().pixelColor(16,16)==QColor("#247848"));
  CHECK(!refreshed.requestPixmap("no-such-icon",&result,QSize(32,32)).isNull());
- writer.setWallpaper("landscape");CHECK(writer.wallpaperUrl().toString()=="qrc:/assets/landscape.png");
+ writer.setWallpaper("lockroom");CHECK(writer.wallpaperUrl().toString()=="qrc:/assets/lockroom.png");
  QTextLayout text(QString::fromUtf8("日本語 中文 한국어 العربية हिन्दी Русский 😀"),QFont("Noto Sans",18));text.beginLayout();auto line=text.createLine();line.setLineWidth(1800);text.endLayout();
  CHECK(!text.glyphRuns().isEmpty());for(const auto &run:text.glyphRuns())for(const auto glyph:run.glyphIndexes())CHECK(glyph!=0);
  QTextStream(stdout)<<"MULTISCRIPT_QT_GLYPH_COVERAGE_PASSED"<<Qt::endl;

@@ -1,4 +1,5 @@
 #include <QtTest>
+#include "sovelmode.h"
 #include <memory>
 #include <algorithm>
 #include <QLocalServer>
@@ -133,8 +134,9 @@ private slots:
         QVERIFY(reader.reducedMotion());QVERIFY(reader.lowEffects());
         writer.setWallpaper("../../invalid");
         QCOMPARE(writer.wallpaper(),QString("lockroom"));
+        // The violet landscape is Private-only; Normal Mode falls back to the city.
         writer.setWallpaper("landscape");
-        QTRY_COMPARE(reader.wallpaper(),QString("landscape"));
+        QTRY_COMPARE(reader.wallpaper(),SovelMode::isPrivate()?QString("landscape"):QString("city"));
         writer.setWallpaper(previous);writer.setReducedMotion(motion);writer.setLowEffects(effects);
     }
     void layoutIsValidatedAndPersisted(){
