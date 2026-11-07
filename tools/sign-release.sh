@@ -42,6 +42,6 @@ gpgv --keyring ./keys/sovel-updates-archive-keyring.gpg "$dist/InRelease"
 gpgv --keyring ./keys/sovel-updates-archive-keyring.gpg "$dist/Release.gpg" "$dist/Release"
 
 git add "$dist/Release" "$dist/InRelease" "$dist/Release.gpg"
-git commit -m "Sign APT index for $(git rev-parse --abbrev-ref HEAD)"
+git commit -m "Sign APT index for $(git rev-parse --abbrev-ref HEAD)" ${SOVEL_COMMIT_TRAILER:+-m "$SOVEL_COMMIT_TRAILER"}
 git push origin HEAD
 echo "Signed and pushed. Claude verifies the signature and publishes it to main."
