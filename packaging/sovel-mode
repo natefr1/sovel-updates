@@ -181,7 +181,7 @@ def vault_lock():
     if not os.access(VAULT, os.X_OK):
         return 0
     result = quiet([VAULT, 'lock'], timeout=15)
-    return 0 if result is None or result.returncode == 0 else 1
+    return 0 if result is not None and result.returncode == 0 else 1
 
 
 def close_windows(seconds):

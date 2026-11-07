@@ -9,9 +9,12 @@ after 15 idle minutes, and is closed whenever Sovel locks.
 Passphrases are read from standard input, passed to gocryptfs through a pipe,
 and never written to disk, logs or command lines.
 """
+import errno
 import grp
 import json
 import os
+import pty
+import re
 import shutil
 import subprocess
 import sys
@@ -73,6 +76,35 @@ def status():
     return {'initialized': initialized(), 'mounted': mounted(), 'mountpoint': str(MOUNT)}
 
 
+def create_cipher(secret):
+    tool = shutil.which('gocryptfs')
+    if not tool:
+        raise ValueError('gocryptfs is not installed.')
+    # gocryptfs only displays its one-time key on a terminal. Keep that
+    # terminal private to this process and pass the password on a pipe.
+    reader, terminal = pty.openpty()
+    try:
+        try:
+            result = subprocess.run([tool, '-passfile', '/dev/stdin', '-init', str(CIPHER)],
+                                    input=(secret + '\n').encode('utf-8'), stdout=terminal,
+                                    stderr=terminal, env={**os.environ, 'NO_COLOR': '1'}, timeout=60)
+        finally:
+            os.close(terminal)
+        if result.returncode:
+            raise ValueError('The Vault could not be created.')
+        response = bytearray()
+        try:
+            while chunk := os.read(reader, 4096):
+                response.extend(chunk)
+        except OSError as error:
+            if error.errno != errno.EIO:  # Linux PTY end-of-file
+                raise
+    finally:
+        os.close(reader)
+    key = re.search(rb'Your master key is:\s*((?:[a-f0-9]{8}-\s*){7}[a-f0-9]{8})', response)
+    return b''.join(key[1].split()).decode('ascii') if key else ''
+
+
 def init():
     if initialized():
         raise ValueError('The Vault already exists.')
@@ -81,17 +113,10 @@ def init():
         raise ValueError(f'Use a Vault passphrase of at least {MINIMUM} characters.')
     CIPHER.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(DATA, 0o700)
-    result = gocryptfs(['-init', str(CIPHER)], secret)
-    secret = ''
-    if result.returncode:
-        raise ValueError('The Vault could not be created.')
-    text = result.stdout.decode('utf-8', 'replace')
-    key = ''
-    for line in text.splitlines():
-        if line.count('-') >= 7 and all(part.strip().isalnum() for part in line.strip().split('-')):
-            key = line.strip()
+    key = create_cipher(secret)
     return {**status(), 'masterKey': key,
-            'message': 'Vault created. Store the master key offline; it can recover the Vault if the passphrase is lost.'}
+            'message': ('Vault created. Store the master key offline; it can recover the Vault if the passphrase is lost.'
+                        if key else 'Vault created, but the recovery key could not be read. Keep the passphrase safe.')}
 
 
 def unlock():

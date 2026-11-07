@@ -121,6 +121,19 @@ def write_atomic(path, text, mode=0o644):
     temporary.replace(path)
 
 
+MACHINE_ID = Path('/etc/machine-id')
+
+
+def local_record_section(record, section):
+    try:
+        machine_id = MACHINE_ID.read_text(encoding='utf-8').strip()
+    except OSError:
+        return {}
+    entries = record.get(section)
+    entry = entries.get(machine_id) if isinstance(entries, dict) else None
+    return entry if isinstance(entry, dict) else {}
+
+
 def homed_record(user):
     text = output(['homectl', 'inspect', '--json=short', user])
     if not text:
@@ -129,16 +142,18 @@ def homed_record(user):
         record = json.loads(text)
     except ValueError:
         return {}
-    return record if isinstance(record, dict) else {}
+    if not isinstance(record, dict):
+        return {}
+    binding = local_record_section(record, 'binding')
+    for field in ('storage', 'imagePath', 'homeDirectory'):
+        if field in binding:
+            record[field] = binding[field]
+    return record
 
 
 def record_state(record):
-    status = record.get('status')
-    if isinstance(status, dict):
-        for value in status.values():
-            if isinstance(value, dict) and isinstance(value.get('state'), str):
-                return value['state']
-    return 'unknown'
+    state = local_record_section(record, 'status').get('state')
+    return state if isinstance(state, str) else 'unknown'
 
 
 def block_types(source):
