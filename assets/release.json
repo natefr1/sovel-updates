@@ -1,10 +1,11 @@
 {
-  "version": "0.1.0-12",
-  "name": "Stable Displays",
-  "type": "Stability update",
+  "version": "0.1.0-13",
+  "name": "Desktop Fix",
+  "type": "Fix update",
   "icon": "sovel-settings",
   "channel": "public",
   "notes": [
+    "Fixes 0.1.0-12, where the desktop did not start after signing in. Everything from Stable Displays is included.",
     "Windows stay on their own display when you use the menu bar, its dropdowns or Do Not Disturb.",
     "A rebuilt display arranger: real sizes and positions, edge snapping, separate resolution and refresh rate, VRR, and Keep or Revert within 15 seconds.",
     "GTK and GNOME windows, including save dialogs, follow Sovel's dark palette. Wi-Fi, Bluetooth and Sound lists are readable again.",

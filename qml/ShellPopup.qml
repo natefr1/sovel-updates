@@ -14,14 +14,13 @@ Popup {
  onClosed:if(typeof Chrome!=="undefined")Chrome.registerPopup(root,false)
  Connections {target:sovelWindow;function onActiveChanged(){if(!sovelWindow.active&&root.visible)root.close()}}
  Connections {target:Qt.application;function onStateChanged(){if(Qt.application.state!==Qt.ApplicationActive)root.close()}}
- // Slide and fade only: the popup's size never animates, so content does not reflow.
- transform:Translate {id:slide}
+ // Fade and a slight scale: the popup's size never animates, so content does not reflow.
  enter:Transition {ParallelAnimation {
   NumberAnimation {property:"opacity";from:0;to:1;duration:root.still?0:150;easing.type:Easing.OutCubic}
-  NumberAnimation {target:slide;property:"y";from:root.still?0:-6;to:0;duration:root.still?0:150;easing.type:Easing.OutCubic}
+  NumberAnimation {property:"scale";from:root.still?1:0.97;to:1;duration:root.still?0:150;easing.type:Easing.OutCubic}
  }}
  exit:Transition {ParallelAnimation {
   NumberAnimation {property:"opacity";from:1;to:0;duration:root.still?0:120;easing.type:Easing.InCubic}
-  NumberAnimation {target:slide;property:"y";from:0;to:root.still?0:-4;duration:root.still?0:120;easing.type:Easing.InCubic}
+  NumberAnimation {property:"scale";from:1;to:root.still?1:0.98;duration:root.still?0:120;easing.type:Easing.InCubic}
  }}
 }
