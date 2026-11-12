@@ -1,14 +1,15 @@
 {
-  "version": "0.1.0-11",
-  "name": "Private Access",
-  "type": "Fix update",
-  "icon": "sovel-vault",
+  "version": "0.1.0-12",
+  "name": "Stable Displays",
+  "type": "Stability update",
+  "icon": "sovel-settings",
   "channel": "public",
   "notes": [
-    "JARED is back on your desktop until you set up Private Mode, then it moves into the encrypted workspace.",
-    "Sovel menu → Set Up Private Workspace opens a guided setup. Afterwards the same item, or Super+Shift+P, opens Private Mode.",
-    "Normal Mode starts on the city wallpaper. The violet landscape, spider emblem and laboratory now belong to Private Mode.",
-    "Super+Shift+P explains what is wrong instead of doing nothing, and never locks for a private sign-in that is not running.",
-    "The isolation check and private audit log open from Settings again. New command: sovel-mode doctor."
+    "Windows stay on their own display when you use the menu bar, its dropdowns or Do Not Disturb.",
+    "A rebuilt display arranger: real sizes and positions, edge snapping, separate resolution and refresh rate, VRR, and Keep or Revert within 15 seconds.",
+    "GTK and GNOME windows, including save dialogs, follow Sovel's dark palette. Wi-Fi, Bluetooth and Sound lists are readable again.",
+    "The Sovel file picker replaces the GTK one for apps that use the portal, with places, drives, search, new folder and overwrite warnings.",
+    "A Downloads hub in the menu bar, completion notifications and Settings → Apps & Defaults → Downloads.",
+    "Drawing tablets: the pen controls its own display automatically, with Settings → Drawing Tablets for mapping, buttons, touch and active area."
   ]
 }

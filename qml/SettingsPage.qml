@@ -18,10 +18,12 @@ ColumnLayout {
   }
  }
  Loader {id:livePanel;Layout.fillWidth:true;Layout.preferredHeight:item?item.implicitHeight:0
-  sourceComponent:root.page.id==="sound"?soundPanel:root.page.id==="devices"?bluetoothPanel:root.page.id==="network"?networkPanel:root.page.id==="power"?powerPanel:root.page.id==="wallpaper"?wallpaperPanel:root.page.id==="updates"?updatesPanel:root.page.id==="displays"&&typeof Displays!=="undefined"&&Displays?displayPanel:null
+  sourceComponent:root.page.id==="sound"?soundPanel:root.page.id==="devices"?bluetoothPanel:root.page.id==="network"?networkPanel:root.page.id==="power"?powerPanel:root.page.id==="wallpaper"?wallpaperPanel:root.page.id==="updates"?updatesPanel:root.page.id==="displays"&&typeof Displays!=="undefined"&&Displays?displayPanel:root.page.id==="tablets"?tabletPanel:root.page.id==="apps"&&typeof DownloadsHub!=="undefined"&&DownloadsHub?downloadsPanel:null
  }
  Component {id:soundPanel;SoundPanel {audio:Audio}}
  Component {id:displayPanel;DisplayPanel {}}
+ Component {id:tabletPanel;TabletPanel {}}
+ Component {id:downloadsPanel;DownloadsPanel {}}
  Component {id:bluetoothPanel;BluetoothPanel {radio:Radio;onAdvancedRequested:System.launch("bluetooth-config")}}
  Component {id:networkPanel;ColumnLayout {spacing:16
   Component.onCompleted:System.refreshNetwork()

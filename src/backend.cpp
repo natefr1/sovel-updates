@@ -302,8 +302,8 @@ void Backend::launch(const QString &app){
         entry->start("/usr/bin/sovel-mode",{"enter-private"});
         return;
     }
-    if(app=="updates"||app=="sound-settings"||app=="display-settings"){
-        const auto page=app=="updates"?"updates":app=="sound-settings"?"sound":"displays";
+    if(app=="updates"||app=="sound-settings"||app=="display-settings"||app=="download-settings"||app=="tablet-settings"){
+        const auto page=app=="updates"?"updates":app=="sound-settings"?"sound":app=="download-settings"?"apps":app=="tablet-settings"?"tablets":"displays";
         if(!launchManaged(QCoreApplication::applicationFilePath(),{"--app","settings","--settings-page",page}))message("Could not open Settings.");
         return;
     }

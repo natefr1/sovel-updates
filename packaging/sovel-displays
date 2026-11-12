@@ -17,6 +17,7 @@ import uuid
 TRANSFORMS = {"normal", "90", "180", "270", "flipped", "flipped-90", "flipped-180", "flipped-270"}
 CONFIG = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "Sovel" / "Displays.json"
 RUNTIME = Path(os.environ["XDG_RUNTIME_DIR"]) / "sovel-displays"
+CONFIRM_SECONDS = 15
 PENDING = RUNTIME / "pending.json"
 ENVIRONMENT = dict(os.environ, LC_ALL="C")
 
@@ -75,6 +76,11 @@ def parse_outputs(text):
             output["scale"] = float(value.split(":", 1)[1])
         elif value.startswith("Transform:"):
             output["transform"] = value.split(":", 1)[1].strip()
+        elif value.startswith("Adaptive Sync:"):
+            output["adaptiveSync"] = value.split(":", 1)[1].strip() == "enabled"
+        elif value.startswith("Physical size:"):
+            if size := re.match(r"(\d+)x(\d+) mm", value.split(":", 1)[1].strip()):
+                output["physicalWidth"], output["physicalHeight"] = map(int, size.groups())
         elif match := re.match(r"(\d+)x(\d+) px(?:, ([\d.]+) Hz)?(.*)$", value):
             width, height, rate, flags = match.groups()
             mode = width + "x" + height
@@ -87,6 +93,11 @@ def parse_outputs(text):
     for output in outputs:
         if not output["mode"] and output["modes"]:
             output["mode"] = next((m["id"] for m in output["modes"] if m["preferred"]), output["modes"][0]["id"])
+    # Number displays the way they sit on the desk: left to right, then top to
+    # bottom. The arranger and the Identify overlay use the same numbers.
+    ordered = sorted(outputs, key=lambda o: (not o["enabled"], o["x"], o["y"], o["name"]))
+    for number, output in enumerate(ordered, 1):
+        output["number"] = number
     return outputs
 
 
@@ -117,6 +128,11 @@ def settings(outputs, proposal, require_complete):
         if type(active) is not bool:
             raise ValueError("Invalid display state.")
         mode, transform = row["mode"], row["transform"]
+        sync = row.get("adaptiveSync")
+        if sync is not None and type(sync) is not bool:
+            raise ValueError("Invalid adaptive sync setting.")
+        if "adaptiveSync" not in device:
+            sync = None
         x, y, scale = row["x"], row["y"], row["scale"]
         if active:
             if mode and mode not in {entry["id"] for entry in device["modes"]}:
@@ -125,8 +141,11 @@ def settings(outputs, proposal, require_complete):
                 raise ValueError("Invalid orientation or display position.")
             if abs(x) > 32768 or abs(y) > 32768 or not math.isfinite(scale) or not 0.5 <= scale <= 4:
                 raise ValueError("Display position or scale is outside the supported range.")
-        result.append(dict(name=name, description=device["description"], enabled=active, mode=mode,
-                           transform=transform, x=x, y=y, scale=scale, identity=identity(device)))
+        entry = dict(name=name, description=device["description"], enabled=active, mode=mode,
+                     transform=transform, x=x, y=y, scale=scale, identity=identity(device))
+        if sync is not None:
+            entry["adaptiveSync"] = sync
+        result.append(entry)
     if require_complete and set(by_name) != used:
         raise ValueError("A display changed. Detect displays and try again.")
     if not any(row["enabled"] for row in result):
@@ -144,15 +163,36 @@ def apply(rows):
             arguments.extend(("--mode", row["mode"]))
         arguments.extend(("--pos", f'{row["x"]},{row["y"]}', "--scale", str(row["scale"]),
                           "--transform", row["transform"]))
+        if "adaptiveSync" in row:
+            arguments.extend(("--adaptive-sync", "enabled" if row["adaptiveSync"] else "disabled"))
     randr("--dryrun", *arguments)
     randr(*arguments)
+
+
+def matches(row, output):
+    """True when the output already shows this saved arrangement."""
+    if row["enabled"] != output["enabled"]:
+        return False
+    if not row["enabled"]:
+        return True
+    same = (row["x"], row["y"], row["transform"]) == (output["x"], output["y"], output["transform"])
+    same = same and abs(float(row["scale"]) - float(output["scale"])) < 0.001
+    same = same and (not row["mode"] or row["mode"] == output["mode"])
+    return same and ("adaptiveSync" not in row or row["adaptiveSync"] == output.get("adaptiveSync"))
 
 
 def restore(rows):
     outputs = current()
     saved = {row["identity"]: row for row in rows}
     proposal = [saved.get(identity(output), output) for output in outputs]
-    apply(settings(outputs, proposal, True))
+    wanted = settings(outputs, proposal, True)
+    # Re-applying an identical layout still makes Labwc re-arrange every
+    # window, so a restore that changes nothing does nothing.
+    by_name = {output["name"]: output for output in outputs}
+    if all(matches(row, by_name[row["name"]]) for row in wanted):
+        return False
+    apply(wanted)
+    return True
 
 
 def run(action, argument=None):
@@ -160,7 +200,7 @@ def run(action, argument=None):
     if action == "list":
         return {"outputs": current(), "config": read(CONFIG), "pending": pending.get("token", "")}
     if action == "identify":
-        numbers = {row["name"]: index for index, row in enumerate(current(), 1)}
+        numbers = {row["name"]: row["number"] for row in current()}
         save(RUNTIME / "identify.json", {"until": time.time() + 6, "numbers": numbers})
         return {"message": "Showing display numbers."}
     if action == "revert":
@@ -215,7 +255,8 @@ def run(action, argument=None):
             finally:
                 PENDING.unlink(missing_ok=True)
             raise
-        return {"pending": token, "message": "Keep these display changes? They revert in 20 seconds."}
+        return {"pending": token, "seconds": CONFIRM_SECONDS,
+                "message": f"Keep these display changes? They revert in {CONFIRM_SECONDS} seconds."}
     raise ValueError("Unsupported display action.")
 
 
@@ -225,7 +266,7 @@ def main():
     if action == "preview":
         argument = json.loads(sys.stdin.buffer.read(128 * 1024))
     if action == "deadline":
-        time.sleep(20)
+        time.sleep(CONFIRM_SECONDS)
         action = "revert"
     RUNTIME.mkdir(mode=0o700, exist_ok=True)
     with (RUNTIME / "lock").open("a") as lock:

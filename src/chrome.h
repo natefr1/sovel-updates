@@ -26,7 +26,7 @@ public:
  bool shown()const{return m_shown;}
  bool popupOpen()const{return m_popupCount>0;}
  void shareTopEdgeWith(Chrome *bar){m_topBar=bar;}
- Q_INVOKABLE void configure(const QVariantMap &value){m_enabled=value.value("enabled",true).toBool();m_autoHide=value.value("autoHide",true).toBool();m_sensitivity=qBound(2,value.value("sensitivity",8).toInt(),24);m_revealDelay=qBound(0,value.value("revealDelay",80).toInt(),1000);m_hideDelay=qBound(100,value.value("hideDelay",450).toInt(),2500);m_edge=m_surface=="bar"?"top":value.value("activationEdge","bottom").toString();update();}
+ Q_INVOKABLE void configure(const QVariantMap &value){m_enabled=value.value("enabled",true).toBool();m_reserve=value.value("reserve",m_enabled&&!value.value("autoHide",true).toBool()).toBool();m_autoHide=value.value("autoHide",true).toBool();m_sensitivity=qBound(2,value.value("sensitivity",8).toInt(),24);m_revealDelay=qBound(0,value.value("revealDelay",80).toInt(),1000);m_hideDelay=qBound(100,value.value("hideDelay",450).toInt(),2500);m_edge=m_surface=="bar"?"top":value.value("activationEdge","bottom").toString();update();}
  Q_INVOKABLE void setContentRect(int x,int y,int w,int h){m_content=QRect(x,y,w,h);apply();}
  Q_INVOKABLE void setAutoHidden(bool value){if(value&&!m_autoHidden&&m_inside&&content().contains(m_position))m_revealed=true;m_autoHidden=value;update();}
  Q_INVOKABLE void setShown(bool value){setAutoHidden(!value);}
@@ -71,15 +71,23 @@ private:
  void apply(){
   if(!m_desktop||(m_surface!="bar"&&m_surface!="dock"))return;
   // Keep an independent native edge strip throughout the reveal animation.
-  m_view->setMask(!m_enabled?QRegion(QRect(-2,-2,1,1)):m_popupCount?QRegion():m_shown?(QRegion(content())|QRegion(edge())):QRegion(edge()));
+  const QRegion mask=!m_enabled?QRegion(QRect(-2,-2,1,1)):m_popupCount?QRegion():m_shown?(QRegion(content())|QRegion(edge())):QRegion(edge());
+  if(!m_maskSet||mask!=m_mask){m_mask=mask;m_maskSet=true;m_view->setMask(mask);}
 #ifdef SOVEL_LAYER_SHELL
-  auto layer=LayerShellQt::Window::get(m_view);
-  layer->setLayer(LayerShellQt::Window::LayerOverlay);
-  layer->setExclusiveZone(m_surface=="bar"&&m_shown?30:0);
-  layer->setKeyboardInteractivity(!m_enabled?LayerShellQt::Window::KeyboardInteractivityNone:m_popupCount?LayerShellQt::Window::KeyboardInteractivityExclusive:LayerShellQt::Window::KeyboardInteractivityOnDemand);
+  // The reserved strip never changes while the bar reveals, hides or opens a
+  // menu. Every change makes Labwc re-arrange all windows, which moved windows
+  // on other displays to the display under the pointer.
+  using L=LayerShellQt::Window;
+  auto layer=L::get(m_view);
+  const int zone=m_surface=="bar"&&m_reserve?30:0;
+  const auto keyboard=!m_enabled?L::KeyboardInteractivityNone:m_popupCount?L::KeyboardInteractivityExclusive:L::KeyboardInteractivityOnDemand;
+  if(!m_layerSet){layer->setLayer(L::LayerOverlay);m_layerSet=true;}
+  if(zone!=m_zone){m_zone=zone;layer->setExclusiveZone(zone);}
+  if(keyboard!=m_keyboard){m_keyboard=keyboard;layer->setKeyboardInteractivity(keyboard);}
 #endif
  }
- QQuickView *m_view;QString m_surface,m_edge="bottom";bool m_desktop,m_enabled=true,m_autoHide=true,m_autoHidden=false,m_shown=true,m_revealed=false,m_inside=false;
+ QQuickView *m_view;QString m_surface,m_edge="bottom";bool m_desktop,m_enabled=true,m_autoHide=true,m_autoHidden=false,m_shown=true,m_revealed=false,m_inside=false,m_reserve=false;
+ QRegion m_mask;bool m_maskSet=false,m_layerSet=false;int m_zone=-1,m_keyboard=-1;
  QPointer<Chrome> m_topBar;
  QSet<QObject*> m_popups;
  int m_popupCount=0,m_sensitivity=8,m_revealDelay=80,m_hideDelay=450;QRect m_content;QPoint m_position{-1,-1};QTimer m_reveal,m_hide;

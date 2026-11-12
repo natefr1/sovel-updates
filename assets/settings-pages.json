@@ -624,9 +624,57 @@
               "detail": "Device-specific controls appear when a supported tool is installed."
             }
           ]
+        },
+        {
+          "title": "Drawing tablets",
+          "items": [
+            {
+              "type": "link",
+              "label": "Drawing Tablets",
+              "target": "tablets",
+              "detail": ""
+            }
+          ]
         }
       ],
       "legacy": 10
+    },
+    {
+      "id": "tablets",
+      "name": "Drawing Tablets",
+      "group": "Hardware",
+      "icon": "display",
+      "description": "Pen displays and drawing tablets: which screen the pen controls, buttons and touch.",
+      "sections": [
+        {
+          "title": "Pressure and tilt",
+          "items": [
+            {
+              "type": "info",
+              "label": "Handled by your drawing app",
+              "detail": "Sovel passes pressure and tilt straight to apps. Adjust pressure curves in the app, for example Krita: Settings → Configure Krita → Tablet settings."
+            }
+          ]
+        },
+        {
+          "title": "Related settings",
+          "items": [
+            {
+              "type": "link",
+              "label": "Displays & Graphics",
+              "target": "displays",
+              "detail": ""
+            },
+            {
+              "type": "link",
+              "label": "Bluetooth & Devices",
+              "target": "devices",
+              "detail": ""
+            }
+          ]
+        }
+      ],
+      "legacy": 12
     },
     {
       "id": "input",
@@ -941,6 +989,36 @@
               "type": "info",
               "label": "Add-only policy",
               "detail": "All existing Store listings remain available. Store removal operations remain disabled."
+            }
+          ]
+        },
+        {
+          "title": "Downloads",
+          "items": [
+            {
+              "type": "preference",
+              "key": "downloads.notify"
+            },
+            {
+              "type": "preference",
+              "key": "downloads.openHub"
+            },
+            {
+              "type": "preference",
+              "key": "bar.show.downloads"
+            },
+            {
+              "type": "preference",
+              "key": "downloads.sovelPicker"
+            },
+            {
+              "type": "preference",
+              "key": "downloads.rememberFolder"
+            },
+            {
+              "type": "info",
+              "label": "Ask where to save",
+              "detail": "Browsers decide this themselves. In Firefox: Settings → General → Downloads. In Chrome and Brave: Settings → Downloads."
             }
           ]
         },
@@ -2156,7 +2234,7 @@
       "default": true
     },
     "bar.show.downloads": {
-      "label": "Downloads",
+      "label": "Show Downloads in the menu bar",
       "kind": "switch",
       "default": false
     },
@@ -2461,6 +2539,26 @@
       "modes": [
         "private"
       ]
+    },
+    "downloads.notify": {
+      "label": "Notify when a download finishes",
+      "kind": "switch",
+      "default": true
+    },
+    "downloads.openHub": {
+      "label": "Open the Downloads hub when a download finishes",
+      "kind": "switch",
+      "default": false
+    },
+    "downloads.sovelPicker": {
+      "label": "Use the Sovel file picker in apps",
+      "kind": "switch",
+      "default": true
+    },
+    "downloads.rememberFolder": {
+      "label": "Remember each app's last save folder",
+      "kind": "switch",
+      "default": true
     }
   }
 }

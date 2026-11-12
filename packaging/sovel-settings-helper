@@ -3,7 +3,7 @@
 import configparser,datetime,json,os,pwd,re,shutil,subprocess,sys,xml.etree.ElementTree as ET
 from pathlib import Path
 
-PAGES=set('home appearance wallpaper desktop menubar widgets displays sound devices input printers network sharing notifications apps power storage users language datetime accessibility gaming screentime privacy private jared backup updates developer about'.split())
+PAGES=set('home appearance wallpaper desktop menubar widgets displays sound devices tablets input printers network sharing notifications apps power storage users language datetime accessibility gaming screentime privacy private jared backup updates developer about'.split())
 ASSISTANT_PAGES={'jared'}
 PRIVATE_CONFIG=Path('/etc/sovel/private.conf')
 PRIVATE_SHORTCUTS={'W-S-p','W-A-p','C-A-p'}
@@ -149,6 +149,7 @@ def report(page):
  elif page=='apps':
   data['defaults']={kind:default_app(mime) for kind,mime in {'Browser':'x-scheme-handler/https','PDF':'application/pdf','Images':'image/png','Video':'video/mp4','Music':'audio/mpeg','Files':'inode/directory'}.items()}
   rows=[row(k,v) for k,v in data['defaults'].items()]
+ elif page=='tablets':return {**tablet_report(),'capabilities':caps}
  elif page=='jared':rows=[row('Runtime','Installed' if shutil.which('llama-server') else 'Not installed'),row('Conversation processing','Local; a model download is needed for general questions'),row('Voice input','Not integrated; no background listening')]
  elif page=='backup':rows=[row('Backup tools','Available' if caps['backup']['available'] else 'No supported backup application is installed'),row('Automatic rollback','Not enabled without configured snapshots')]
  elif page=='updates':rows=[row('Channel','Signed public / stable'),row('Restart required','Yes' if Path('/run/reboot-required').exists() or Path('/run/sovel-desktop-restart-required').exists() else 'No')]
@@ -159,6 +160,169 @@ def schema():
  for candidate in candidates:
   if candidate.is_file():return json.loads(candidate.read_text(encoding='utf-8'))
  raise ValueError('The settings schema is missing.')
+# Drawing tablets ---------------------------------------------------------
+PEN_DISPLAY_WORDS=('kamvas','huion','wacom','cintiq','xp-pen','xppen','artist','gaomon','veikk','ugee','turcom','pen display')
+TABLET_BUTTONS=('Left','Right','Middle')
+def input_bits(value,bit):
+ words=value.split()
+ index=bit//64
+ if index>=len(words):return False
+ try:return bool(int(words[-1-index],16)>>(bit%64)&1)
+ except ValueError:return False
+def input_devices():
+ """Pens and touch screens from /proc/bus/input/devices (readable by every account)."""
+ try:text=Path('/proc/bus/input/devices').read_text(encoding='utf-8',errors='replace')
+ except OSError:return []
+ devices=[]
+ for block in text.split('\n\n'):
+  fields={'B':{}}
+  for line in block.splitlines():
+   if line.startswith('N: Name='):fields['name']=line[8:].strip().strip('"')
+   elif line.startswith('I: '):fields['id']=line[3:].strip()
+   elif line.startswith('B: '):
+    key,_,value=line[3:].partition('=');fields['B'][key]=value
+  if 'name' not in fields:continue
+  bits=fields['B'];direct=input_bits(bits.get('PROP','0'),1)
+  pen=input_bits(bits.get('KEY',''),0x140) and input_bits(bits.get('ABS',''),24)
+  touch=not pen and direct and input_bits(bits.get('ABS',''),0x35)
+  if pen or touch:
+   entry={'name':fields['name'],'kind':'pen' if pen else 'touch','display':direct}
+   if entry not in devices:devices.append(entry)
+ return devices
+def display_outputs():
+ if not shutil.which('wlr-randr') or not os.environ.get('WAYLAND_DISPLAY'):return []
+ outputs=[]
+ for line in command(['wlr-randr']).splitlines():
+  if line and not line[0].isspace():
+   name,_,description=line.partition(' ')
+   outputs.append({'name':name,'description':description.strip().strip('"') or name})
+ return outputs
+def tablet_config():
+ try:value=json.loads((CONFIG/'tablet.json').read_text(encoding='utf-8'))
+ except (OSError,ValueError):value={}
+ return value if isinstance(value,dict) else {}
+def tablet_output(config,outputs):
+ """The output the pen controls: the saved choice, else a recognised pen display."""
+ chosen=config.get('output','')
+ if chosen=='*':return ''
+ if chosen:return chosen
+ for output in outputs:
+  if any(word in output['description'].lower() for word in PEN_DISPLAY_WORDS):return output['name']
+ return ''
+def tablet_report():
+ devices=input_devices();outputs=display_outputs();config=tablet_config()
+ mapped=tablet_output(config,outputs)
+ pens=[d for d in devices if d['kind']=='pen']
+ needs=bool(pens) and any(d['display'] for d in pens) and not mapped and config.get('output','')!='*'
+ rows=[row('Pens and tablets',', '.join(d['name'] for d in pens) or 'None connected'),
+       row('Touch screens',', '.join(d['name'] for d in devices if d['kind']=='touch') or 'None connected'),
+       row('Pen controls',next((o['description'] for o in outputs if o['name']==mapped),'The whole desktop') if pens else 'No tablet connected')]
+ return {'rows':rows,'devices':devices,'outputs':outputs,'config':config,'mapped':mapped,'automatic':not config.get('output'),'needsMapping':needs}
+def save_tablet_config(payload):
+ outputs={o['name'] for o in display_outputs()}
+ output=payload.get('output','')
+ if not isinstance(output,str) or (output not in ('','*') and output not in outputs and output!=tablet_config().get('output')):raise ValueError('Choose a connected display.')
+ rotate=payload.get('rotate',0)
+ if rotate not in (0,90,180,270):raise ValueError('Invalid orientation.')
+ buttons=payload.get('buttons',{})
+ if not isinstance(buttons,dict) or any(k not in ('Stylus','Stylus2','Stylus3') or v not in TABLET_BUTTONS for k,v in buttons.items()):raise ValueError('Invalid pen button.')
+ area=payload.get('area',{})
+ if not isinstance(area,dict) or any(k not in ('top','left','width','height') or isinstance(v,bool) or not isinstance(v,(int,float)) or not 0<=v<=1000 for k,v in area.items()):raise ValueError('Invalid active area.')
+ value={'output':output,'rotate':rotate,'absolute':payload.get('absolute',True) is True,'touch':payload.get('touch',True) is True,'buttons':buttons,'area':area}
+ atomic_json(CONFIG/'tablet.json',value)
+ result=apply_preferences()
+ return {'message':'Tablet settings applied.',**({'warning':result.get('warning')} if result.get('warning') else {})}
+def write_tablet_section(root):
+ for tag in ('tablet','tabletTool','touch'):
+  for old in root.findall(tag):root.remove(old)
+ config=tablet_config();outputs=display_outputs()
+ output=tablet_output(config,outputs)
+ tablet=ET.SubElement(root,'tablet',{'mapToOutput':output,'rotate':str(config.get('rotate',0)),'mouseEmulation':'no'})
+ area=config.get('area') or {}
+ if area.get('width') and area.get('height'):
+  ET.SubElement(tablet,'area',{k:str(area.get(k,0)) for k in ('top','left','width','height')})
+ ET.SubElement(tablet,'map',{'button':'Tip','to':'Left'})
+ buttons={'Stylus':'Right','Stylus2':'Middle',**config.get('buttons',{})}
+ for button,target in buttons.items():ET.SubElement(tablet,'map',{'button':button,'to':target})
+ # Absolute: the cursor jumps to wherever the pen touches or hovers.
+ ET.SubElement(root,'tabletTool',{'motion':'absolute' if config.get('absolute',True) else 'relative','relativeMotionSensitivity':'1.0'})
+ if config.get('touch',True):
+  for device in input_devices():
+   if device['kind']=='touch' and device['display']:
+    ET.SubElement(root,'touch',{'deviceName':device['name'],'mapToOutput':output,'mouseEmulation':'no'})
+PORTAL_MARKER='# Managed by Sovel Settings: the GTK file picker was chosen.'
+def apply_file_picker(use_sovel):
+ path=Path(os.environ.get('XDG_CONFIG_HOME',Path.home()/'.config'))/'xdg-desktop-portal'/'sovel-portals.conf'
+ try:current=path.read_text(encoding='utf-8')
+ except OSError:current=None
+ if current is not None and PORTAL_MARKER not in current:return False  # The person's own portal configuration wins.
+ wanted=None if use_sovel else PORTAL_MARKER+'\n[preferred]\ndefault=gtk\norg.freedesktop.impl.portal.FileChooser=gtk\norg.freedesktop.impl.portal.ScreenCast=wlr\norg.freedesktop.impl.portal.Screenshot=wlr\n'
+ if wanted==current:return False
+ if wanted is None:path.unlink(missing_ok=True)
+ else:path.parent.mkdir(parents=True,exist_ok=True);path.write_text(wanted,encoding='utf-8')
+ return True
+GTK_MARKER='/* Managed by Sovel Settings. Remove this line to keep your own styles. */'
+def luminance(color):
+ channels=[int(color[i:i+2],16)/255 for i in (1,3,5)]
+ channels=[c/12.92 if c<=0.03928 else ((c+0.055)/1.055)**2.4 for c in channels]
+ return 0.2126*channels[0]+0.7152*channels[1]+0.0722*channels[2]
+def gtk_palette(dark,accent):
+ """Colors for GTK3, GTK4 and libadwaita windows, dialogs and file pickers."""
+ if private_mode():
+  # Private Mode: near-black surfaces, purple accents, periwinkle text.
+  return {'window_bg':'#0B0A10','view_bg':'#08070C','header_bg':'#110E18','popover_bg':'#15111F','card_bg':'#121019','sidebar_bg':'#0E0C14',
+          'fg':'#E3D9FC','muted':'#B3A6CC','border':'#2C2240','accent_bg':'#4928C2','accent_fg':'#FFFFFF','accent':'#C9A6FF','selected_bg':'#3A1F6E','dark':True}
+ level=luminance(accent);accent_fg='#101216' if (level+0.05)/0.056>1.05/(level+0.05) else '#FFFFFF'  # whichever reads better on the accent
+ if not dark:
+  return {'accent_bg':accent,'accent_fg':accent_fg,'accent':accent,'dark':False}
+ return {'window_bg':'#1B1D22','view_bg':'#16181D','header_bg':'#22252C','popover_bg':'#24272E','card_bg':'#20232A','sidebar_bg':'#191B21',
+         'fg':'#EEF0F4','muted':'#A7ADBA','border':'#353944','accent_bg':accent,'accent_fg':accent_fg,'accent':accent if luminance(accent)>0.18 else '#9DB3FF','selected_bg':'#33405E','dark':True}
+def gtk_css(palette,version):
+ lines=[GTK_MARKER]
+ if version==4:
+  names={'accent_bg_color':'accent_bg','accent_fg_color':'accent_fg','accent_color':'accent'}
+  if palette['dark']:
+   names.update({'window_bg_color':'window_bg','window_fg_color':'fg','view_bg_color':'view_bg','view_fg_color':'fg','headerbar_bg_color':'header_bg','headerbar_fg_color':'fg',
+                 'headerbar_backdrop_color':'window_bg','popover_bg_color':'popover_bg','popover_fg_color':'fg','dialog_bg_color':'popover_bg','dialog_fg_color':'fg',
+                 'card_bg_color':'card_bg','card_fg_color':'fg','sidebar_bg_color':'sidebar_bg','sidebar_fg_color':'fg','borders':'border'})
+ else:
+  names={'theme_selected_bg_color':'accent_bg','theme_selected_fg_color':'accent_fg'}
+  if palette['dark']:
+   names.update({'theme_bg_color':'window_bg','theme_fg_color':'fg','theme_base_color':'view_bg','theme_text_color':'fg','insensitive_fg_color':'muted',
+                 'borders':'border','unfocused_borders':'border','theme_unfocused_bg_color':'window_bg','theme_unfocused_fg_color':'fg','theme_unfocused_base_color':'view_bg'})
+ lines+=[f'@define-color {name} {palette[key]};' for name,key in names.items()]
+ if palette['dark'] and version==3:
+  # Adwaita-dark keeps a few bright surfaces in dialogs; match them to the palette.
+  lines+=['headerbar, .titlebar { background: '+palette['header_bg']+'; color: '+palette['fg']+'; }',
+          'placessidebar, .sidebar { background: '+palette['sidebar_bg']+'; }',
+          'entry { background: '+palette['view_bg']+'; color: '+palette['fg']+'; }',
+          'menu, .menu, popover.background > contents { background: '+palette['popover_bg']+'; color: '+palette['fg']+'; }']
+ return '\n'.join(lines)+'\n'
+def write_gtk_settings(path,values):
+ parser=configparser.ConfigParser(interpolation=None);parser.optionxform=str
+ try:parser.read(path,encoding='utf-8')
+ except (OSError,configparser.Error):parser=configparser.ConfigParser(interpolation=None);parser.optionxform=str
+ if not parser.has_section('Settings'):parser.add_section('Settings')
+ for key,value in values.items():parser.set('Settings',key,value)
+ path.parent.mkdir(parents=True,exist_ok=True);temporary=path.with_suffix('.new')
+ with temporary.open('w',encoding='utf-8') as handle:parser.write(handle,space_around_delimiters=False)
+ temporary.replace(path)
+def apply_gtk_theme(validated):
+ mode=validated['appearance.mode']
+ dark=mode!='light'
+ if mode=='automatic':dark=not 7<=datetime.datetime.now().hour<19
+ if private_mode():dark=True
+ palette=gtk_palette(dark,validated['appearance.accent'])
+ config_home=Path(os.environ.get('XDG_CONFIG_HOME',Path.home()/'.config'))
+ for version in (3,4):
+  folder=config_home/f'gtk-{version}.0'
+  write_gtk_settings(folder/'settings.ini',{'gtk-application-prefer-dark-theme':'1' if dark else '0',**({'gtk-theme-name':'Adwaita-dark' if dark else 'Adwaita'} if version==3 else {})})
+  css=folder/'gtk.css'
+  try:existing=css.read_text(encoding='utf-8')
+  except OSError:existing=''
+  if existing and GTK_MARKER not in existing:continue  # The person's own styles win.
+  temporary=css.with_suffix('.new');temporary.write_text(gtk_css(palette,version),encoding='utf-8');temporary.replace(css)
+ return 'prefer-dark' if dark else 'prefer-light','Adwaita-dark' if dark else 'Adwaita'
 def apply_preferences():
  values=prefs();definitions=schema()['preferences'];validated={}
  for key,d in definitions.items():
@@ -201,24 +365,34 @@ def apply_preferences():
   action=bind.find('action');run=(action.get('command','') if action is not None else '')
   # JARED and Private entry exist only where they belong.
   if (not assistant_available() and 'sovel --app jared' in run) or 'sovel-mode enter-private' in run:keyboard.remove(bind)
+ write_tablet_section(root)
  shortcut=private_shortcut()
  if shortcut and not private_mode():
   bind=ET.SubElement(keyboard,'keybind',{'key':shortcut});ET.SubElement(bind,'action',{'name':'Execute','command':'/usr/bin/sovel-mode enter-private'})
- destination=CONFIG/'labwc';destination.mkdir(parents=True,exist_ok=True);temporary=destination/'rc.xml.new';tree.write(temporary,encoding='utf-8',xml_declaration=True);temporary.replace(destination/'rc.xml')
+ destination=CONFIG/'labwc';destination.mkdir(parents=True,exist_ok=True);temporary=destination/'rc.xml.new';tree.write(temporary,encoding='utf-8',xml_declaration=True)
+ # Reconfiguring Labwc re-arranges every window, so only do it when its
+ # configuration really changed (not for notification or theme-only changes).
+ try:labwc_changed=temporary.read_bytes()!=(destination/'rc.xml').read_bytes()
+ except OSError:labwc_changed=True
+ if labwc_changed:temporary.replace(destination/'rc.xml')
+ else:temporary.unlink(missing_ok=True)
  autostart=destination/'autostart'
  if not autostart.is_symlink() and not autostart.exists():autostart.symlink_to('/usr/share/sovel/labwc/autostart')
  mako=CONFIG/'mako';mako.mkdir(parents=True,exist_ok=True)
  notification_config='\n'.join(['# Managed by Sovel Settings','background-color=#241830ee','text-color=#f5edff','border-color='+validated['appearance.accent'],'border-radius=14','font='+validated['appearance.font']+' '+str(round(validated['appearance.textSize']*.75)),'default-timeout='+str(validated['notifications.duration']*1000),'max-history='+('100' if validated['notifications.history'] else '0'),'[mode=do-not-disturb]','invisible=1',''])
  atomic_json(CONFIG/'last-applied.json',{'appliedAt':datetime.datetime.now(datetime.timezone.utc).isoformat()})
  temporary=mako/'config.new';temporary.write_text(notification_config,encoding='utf-8');temporary.replace(mako/'config')
- if os.environ.get('WAYLAND_DISPLAY') and shutil.which('labwc'):command(['labwc','--reconfigure'],check=True)
+ if labwc_changed and os.environ.get('WAYLAND_DISPLAY') and shutil.which('labwc'):command(['labwc','--reconfigure'],check=True)
  if os.environ.get('WAYLAND_DISPLAY') and Path('/usr/bin/sovel-mode').is_file():command(['/usr/bin/sovel-mode','idle'])
+ color,gtk_theme=apply_gtk_theme(validated)
+ if apply_file_picker(validated['downloads.sovelPicker']) and os.environ.get('WAYLAND_DISPLAY') and shutil.which('systemctl'):
+  command(['systemctl','--user','try-restart','xdg-desktop-portal.service'])
  if shutil.which('gsettings'):
   keys=command(['gsettings','list-keys','org.gnome.desktop.interface']).splitlines()
-  mode=validated['appearance.mode'];color='prefer-light' if mode=='light' else 'prefer-dark'
-  if mode=='automatic':color='prefer-light' if 7<=datetime.datetime.now().hour<19 else 'prefer-dark'
-  for key,value in {'color-scheme':color,'font-name':f"{validated['appearance.font']} {round(validated['appearance.textSize']*.75)}"}.items():
-   if key in keys:command(['gsettings','set','org.gnome.desktop.interface',key,value],check=True)
+  # GTK4 and libadwaita follow color-scheme; GTK3 apps (including the portal
+  # dialogs) only follow gtk-theme, which is why they stayed bright.
+  for key,value in {'color-scheme':color,'gtk-theme':gtk_theme,'font-name':f"{validated['appearance.font']} {round(validated['appearance.textSize']*.75)}"}.items():
+   if key in keys and command(['gsettings','get','org.gnome.desktop.interface',key]).strip().strip("'")!=value:command(['gsettings','set','org.gnome.desktop.interface',key,value],check=True)
  if os.environ.get('WAYLAND_DISPLAY') and shutil.which('makoctl'):
   command(['makoctl','reload'])
   command(['makoctl','mode','-a' if validated['notifications.focus'] else '-r','do-not-disturb'])
@@ -264,6 +438,7 @@ def run_startup():
 
 def user_action(operation,payload):
  if operation=='apply-preferences':return apply_preferences()
+ if operation=='tablet-config':return save_tablet_config(payload)
  if operation=='run-startup':return run_startup()
  if operation=='default-apps':
   apps=desktop_apps();return {'message':'Choose a default application.','associations':[{'name':name,'mime':mime,'current':default_app(mime),'apps':[{'id':a['id'],'name':a['name']} for a in apps.values() if mime in a['mimeTypes']]} for name,mime in MIMES.items()]}

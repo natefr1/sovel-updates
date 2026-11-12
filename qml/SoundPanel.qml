@@ -16,7 +16,7 @@ ColumnLayout {
  onPageChanged:{audio.monitorInput("",false);audio.stopRecording();meterDevice=""}
  component Title:Text {Layout.fillWidth:true;color:SettingsService.colors.text;font.pixelSize:17;font.bold:true;wrapMode:Text.Wrap}
  component Note:Text {Layout.fillWidth:true;color:SettingsService.colors.muted;font.pixelSize:12;wrapMode:Text.Wrap;textFormat:Text.PlainText}
- component Box:Rectangle {default property alias body:inside.data;Layout.fillWidth:true;implicitHeight:inside.implicitHeight+30;radius:16;color:SettingsService.colors.muted;border.color:SettingsService.colors.text;ColumnLayout {id:inside;anchors.fill:parent;anchors.margins:15;spacing:12}}
+ component Box:Rectangle {default property alias body:inside.data;Layout.fillWidth:true;implicitHeight:inside.implicitHeight+30;radius:16;color:SettingsService.colors.surface;border.color:SettingsService.colors.border;ColumnLayout {id:inside;anchors.fill:parent;anchors.margins:15;spacing:12}}
  component LevelControl:RowLayout {
   id:control;required property var entry;property bool input:false
   Layout.fillWidth:true

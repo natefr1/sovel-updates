@@ -43,6 +43,9 @@ export XDG_CURRENT_DESKTOP=Sovel
 export XDG_SESSION_DESKTOP=sovel
 export QT_QPA_PLATFORM=wayland
 export QT_QUICK_CONTROLS_STYLE=Basic
+# Route GTK file dialogs through the portal, so they open Sovel's file picker.
+export GTK_USE_PORTAL=1
+export GDK_DEBUG="${GDK_DEBUG:+$GDK_DEBUG,}portals"
 # Preserve a previously selected input method; set a fresh session's defaults.
 : "${QT_IM_MODULE:=fcitx}" "${GTK_IM_MODULE:=fcitx}" "${XMODIFIERS:=@im=fcitx}"
 export QT_IM_MODULE GTK_IM_MODULE XMODIFIERS

@@ -4,6 +4,7 @@ import QtQml.Models
 Item {
     id: root
     property string activeApplication: Windows.activeName
+    property bool primaryDisplay: true
     property string clock: Qt.formatDateTime(new Date(),"ddd MMM d   h:mm AP")
     ShellGlass { anchors.fill: parent; radius: 0; tint: Number(root.preferences["bar.opacity"]||75)/100 }
     TapHandler {acceptedButtons:Qt.RightButton;onTapped:barContext.popup()}
@@ -87,7 +88,7 @@ Item {
     function positionPopup(button){popupX=Math.max(8,Math.min(width-380,button.mapToItem(root,0,0).x))}
     function battery(){return (Workspace.telemetry.batteries||[])[0]||({})}
     function iconName(key){return ({network:"network",bluetooth:"bluetooth",sound:"sound",battery:"battery",notifications:"notifications",updates:"updates",jared:"jared",search:"search",control:"control",calendar:"clock",downloads:"downloads",lock:"lock"})[key]}
-    function showMenu(key,button){positionPopup(button);if(key==="lock"){System.launch("lock");return}if(key==="network")wifiPopover.open();else if(key==="bluetooth")bluetoothPopover.open();else if(key==="sound")soundPopover.open();else if(key==="calendar")calendarPopover.open();else if(key==="jared"){if(jaredMenu.visible)jaredMenu.close();else jaredMenu.open()}else if(key==="control"||key==="battery"||key==="notifications")controlPopover.open();else System.launch(key==="updates"||key==="downloads"?key:"library")}
+    function showMenu(key,button){positionPopup(button);if(key==="lock"){System.launch("lock");return}if(key==="network")wifiPopover.open();else if(key==="bluetooth")bluetoothPopover.open();else if(key==="sound")soundPopover.open();else if(key==="calendar")calendarPopover.open();else if(key==="jared"){if(jaredMenu.visible)jaredMenu.close();else jaredMenu.open()}else if(key==="control"||key==="battery"||key==="notifications")controlPopover.open();else if(key==="downloads"&&typeof DownloadsHub!=="undefined"&&DownloadsHub){DownloadsHub.refresh();downloadsPopover.open()}else System.launch(key==="updates"||key==="downloads"?key:"library")}
     Row {id:statusIcons;anchors.right:parent.right;anchors.rightMargin:12;spacing:2
         Repeater {model:root.order
             BarButton {id:statusButton;required property string modelData
@@ -182,6 +183,44 @@ Item {
             SovelButton {text:"Settings";onClicked:{controlPopover.close();System.launch("settings")}}
         }
     }
+    // Downloads hub: files still being written, then recent downloads.
+    ShellPopup {id:downloadsPopover;x:Math.min(root.popupX,root.width-width-8);y:30;width:380;height:Math.min(downloadsContent.implicitHeight+32,sovelWindow.height-46)
+        contentItem:ScrollView {id:downloadsScroll;clip:true;contentWidth:availableWidth
+          Column {id:downloadsContent;width:downloadsScroll.availableWidth;spacing:10
+            Row {width:parent.width;spacing:8
+                Text {width:parent.width-openAll.implicitWidth-8;text:"Downloads";color:SettingsService.colors.text;font.pixelSize:20;font.bold:true;verticalAlignment:Text.AlignVCenter;height:openAll.height}
+                SovelButton {id:openAll;text:"Open Folder";onClicked:{downloadsPopover.close();DownloadsHub.openFolder()}}
+            }
+            Text {width:parent.width;text:DownloadsHub?(DownloadsHub.status||(DownloadsHub.activeCount?DownloadsHub.activeCount+" in progress · ":"")+DownloadsHub.folder.replace(System.home,"~")):"";color:SettingsService.colors.muted;font.pixelSize:11;elide:Text.ElideMiddle}
+            Repeater {model:DownloadsHub?DownloadsHub.items.slice(0,12):[]
+                Rectangle {required property var modelData;width:parent.width;height:downloadRow.implicitHeight+18;radius:12
+                    color:modelData.partial?Qt.tint(SettingsService.colors.surface,"#30"+String(SettingsService.colors.accent).slice(1)):SettingsService.colors.surface;border.color:SettingsService.colors.border
+                    Column {id:downloadRow;anchors.left:parent.left;anchors.right:actions.left;anchors.verticalCenter:parent.verticalCenter;anchors.leftMargin:12;anchors.rightMargin:8;spacing:3
+                        Text {width:parent.width;text:modelData.name;color:SettingsService.colors.text;elide:Text.ElideMiddle;font.pixelSize:13;textFormat:Text.PlainText}
+                        Text {width:parent.width;color:SettingsService.colors.muted;font.pixelSize:11;elide:Text.ElideRight
+                            text:(modelData.partial?"Downloading · ":"")+root.fileSize(modelData.size)+(modelData.partial?"":" · "+Qt.formatDateTime(modelData.modified,"MMM d, h:mm AP"))}
+                        Rectangle {visible:modelData.partial;width:parent.width;height:3;radius:2;color:SettingsService.colors.border
+                            Rectangle {id:sweep;width:parent.width*.3;height:parent.height;radius:2;color:SettingsService.colors.accent
+                                SequentialAnimation on x {running:!System.reducedMotion;loops:Animation.Infinite
+                                    NumberAnimation {from:0;to:downloadRow.width*.7;duration:900;easing.type:Easing.InOutSine}
+                                    NumberAnimation {from:downloadRow.width*.7;to:0;duration:900;easing.type:Easing.InOutSine}}}}
+                    }
+                    Row {id:actions;anchors.right:parent.right;anchors.rightMargin:8;anchors.verticalCenter:parent.verticalCenter;spacing:4;visible:!modelData.partial
+                        SovelButton {text:"Open";onClicked:{downloadsPopover.close();DownloadsHub.open(modelData.path)}}
+                        SovelButton {text:"Show";onClicked:{downloadsPopover.close();DownloadsHub.showInFolder(modelData.path)}}
+                    }
+                }
+            }
+            Text {visible:DownloadsHub&&DownloadsHub.items.length===0;width:parent.width;text:"Nothing downloaded yet.";color:SettingsService.colors.muted;font.pixelSize:13}
+            Text {width:parent.width;wrapMode:Text.Wrap;text:"Browsers control pausing, cancelling and retrying their own downloads.";color:SettingsService.colors.muted;font.pixelSize:11}
+            SovelButton {text:"Download settings";onClicked:{downloadsPopover.close();System.launch("download-settings")}}
+          }
+        }
+    }
+    function fileSize(bytes){if(bytes<1024)return bytes+" B";const units=["KB","MB","GB","TB"];let value=bytes/1024,unit=0;while(value>=1024&&unit<3){value/=1024;unit++}return (value<10?value.toFixed(1):Math.round(value))+" "+units[unit]}
+    // A finished download can open the hub on the primary display.
+    Connections {target:typeof DownloadsHub!=="undefined"?DownloadsHub:null
+        function onCompleted(name,path){if(SettingsService.preferences["downloads.openHub"]&&root.primaryDisplay){if(!downloadsPopover.visible){root.popupX=root.width-400;downloadsPopover.open()}}}}
     Timer {interval:15000;repeat:true;running:root.visible;triggeredOnStart:true;onTriggered:{Radio.inspectWifi();Radio.inspectBluetooth()}}
     Timer {interval:1000;running:true;repeat:true;triggeredOnStart:true;onTriggered:root.clock=Qt.formatDateTime(new Date(),(root.preferences["clock.weekday"]?"ddd MMM d   ":"MMM d   ")+(root.preferences["clock.format"]==="24h"?"HH:mm":"h:mm")+(root.preferences["clock.seconds"]?":ss":"")+(root.preferences["clock.format"]==="24h"?"":" AP"))}
 }

@@ -26,6 +26,8 @@
 #include <QCoreApplication>
 #include <cstdio>
 #include "workspace.h"
+#include "filechooser.h"
+#include "downloads.h"
 #include <QScreen>
 #include <QTimer>
 #include <QStandardPaths>
@@ -83,6 +85,8 @@ int main(int argc,char **argv){
         else if(arg=="--downloads"){mode="files";downloads=true;}
         else if(arg=="--preview-file"&&i+1<argc){mode="file-preview";previewFile=argv[++i];}
         else if(arg=="--display-output"&&i+1<argc)displayOutput=argv[++i];
+        else if(arg=="--file-chooser-portal")mode="file-chooser";
+        else if(arg=="--file-picker-preview"){mode="file-chooser";if(i+1<argc&&!QString(argv[i+1]).startsWith("--"))previewFile=argv[++i];else previewFile="open";}
         else if(arg=="--open-folder"){mode="files";if(i+1<argc&&!QString(argv[i+1]).startsWith("--"))folderPath=argv[++i];}
     }
     // JARED and the Vault exist only in the private account. This is checked
@@ -120,6 +124,12 @@ int main(int argc,char **argv){
     app.setPalette(palette);
     app.setFont(QFont("Noto Sans"));
     app.setDesktopFileName("sovel-"+mode);
+    if(mode=="file-chooser"){
+        // D-Bus activated by xdg-desktop-portal: only the picker's services.
+        Backend pickerBackend;SettingsService pickerSettings;
+        if(!previewFile.isEmpty())return previewFilePicker(&pickerBackend,&pickerSettings,previewFile,capture);
+        return runFileChooserPortal(&pickerBackend,&pickerSettings);
+    }
     Backend backend;Auth auth;Windows windows(nullptr,desktop);Store store;Connectivity radio;Updates updates;Audio audio;
     if(releaseInput){backend.releaseShellInput();return 0;}
     const auto jaredSocket=QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation)+"/sovel-"+mode+".sock";
@@ -146,6 +156,8 @@ int main(int argc,char **argv){
     }
     std::unique_ptr<SettingsService> settingsService;if(mode!="greeter")settingsService=std::make_unique<SettingsService>();
     std::unique_ptr<Displays> displays;if(desktop||mode=="settings")displays=std::make_unique<Displays>();
+    // Only the desktop process announces finished downloads, so Settings never doubles them.
+    std::unique_ptr<Downloads> downloadsHub;if(desktop||mode=="settings")downloadsHub=std::make_unique<Downloads>(settingsService.get(),desktop);
     std::unique_ptr<Workspace> workspace;if(settingsService)workspace=std::make_unique<Workspace>(&backend,settingsService.get(),desktop);
     std::unique_ptr<Jared> jared;
     if(mode=="jared"){
@@ -246,6 +258,7 @@ int main(int argc,char **argv){
         view->rootContext()->setContextProperty("Browser",browser.get());
         if(mode=="file-preview")view->rootContext()->setContextProperty("previewDetails",FileBrowser::inspectFile(previewFile));
         view->rootContext()->setContextProperty("Displays",displays.get());
+        view->rootContext()->setContextProperty("DownloadsHub",downloadsHub.get());
         view->rootContext()->setContextProperty("outputName",screen?screen->name():QString());
         view->rootContext()->setContextProperty("Packages",&packages);
         view->rootContext()->setContextProperty("Radio",&radio);
@@ -361,6 +374,12 @@ int main(int argc,char **argv){
         restoreDisplays->setInterval(600);
         QObject::connect(restoreDisplays,&QTimer::timeout,displays.get(),&Displays::restore);
         QObject::connect(&app,&QGuiApplication::screenAdded,restoreDisplays,[restoreDisplays]{restoreDisplays->start();});
+        // A pen display plugged in later gets its mapping once its screen appears.
+        auto *remapTablets=new QTimer(&app);
+        remapTablets->setSingleShot(true);
+        remapTablets->setInterval(1500);
+        QObject::connect(remapTablets,&QTimer::timeout,settingsService.get(),&SettingsService::applyPreferences);
+        QObject::connect(&app,&QGuiApplication::screenAdded,remapTablets,[remapTablets]{remapTablets->start();});
         restoreDisplays->start();
         QObject::connect(&app,&QGuiApplication::screenAdded,&app,addOutput);
         QObject::connect(&app,&QGuiApplication::screenRemoved,&app,[&](QScreen *screen){

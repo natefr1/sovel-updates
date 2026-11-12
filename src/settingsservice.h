@@ -41,6 +41,9 @@ public:
  Q_INVOKABLE bool exportProfile(const QUrl &file);
  Q_INVOKABLE bool exportDiagnostics(const QUrl &file);
  Q_INVOKABLE void resetAppearance();
+ // Re-applies session settings (keyboard, tablet mapping, GTK theme). Labwc is
+ // only reconfigured when its configuration really changes.
+ void applyPreferences();
 signals:
  void changed();
  void reportsChanged();
@@ -53,7 +56,6 @@ private:
  bool pageExists(const QString &id)const;
  QString helper(bool admin=false)const;
  void run(const QString &operation,const QVariantMap &payload,bool admin,std::function<void(bool,const QVariantMap&)> callback);
- void applyPreferences();
  void updateApplicationTheme();
  QString m_file,m_status;
  QVariantList m_pages;

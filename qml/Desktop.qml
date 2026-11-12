@@ -17,7 +17,7 @@ Item {
     readonly property var outputConfig: desktopMode&&typeof Displays!=="undefined"&&Displays?Displays.config:({})
     readonly property bool placed: surfaceKind==="bar"&&identifying||primaryOutput||(surfaceKind==="bar"?outputConfig.bar!=="primary":outputConfig.dock!=="primary")
     readonly property string displayWallpaper: desktopMode?(outputConfig.wallpaper||{})[outputName]||"":""
-    function configureChrome(){let prefs=Object.assign({},System.shellPreferences);prefs.enabled=root.placed;if(surfaceKind==="bar"){prefs.autoHide=SettingsService.preferences["bar.autoHide"];prefs.enabled=root.placed&&(root.identifying||SettingsService.preferences["bar.visible"])}Chrome.configure(prefs)}
+    function configureChrome(){let prefs=Object.assign({},System.shellPreferences);prefs.enabled=root.placed;if(surfaceKind==="bar"){prefs.autoHide=SettingsService.preferences["bar.autoHide"];prefs.enabled=root.placed&&(root.identifying||SettingsService.preferences["bar.visible"]);prefs.reserve=root.primaryOutput||outputConfig.bar!=="primary";prefs.reserve=prefs.reserve&&!!SettingsService.preferences["bar.visible"]&&!prefs.autoHide}Chrome.configure(prefs)}
     onPlacedChanged:configureChrome()
     onIdentifyingChanged:configureChrome()
     Connections {target:System;function onPreferencesChanged(){root.configureChrome()}}
@@ -86,6 +86,7 @@ Item {
         }
     }
     TopBar {
+        primaryDisplay:root.primaryOutput
         activeApplication:root.displayNumber?"Display "+root.displayNumber:desktopMode?(root.localActive?root.localActive.name:"Desktop"):Windows.activeName
         width: parent.width; height: 30; visible: !desktopMode || surfaceKind === "bar"&&root.placed
         y: root.chromeShown ? 0 : -30

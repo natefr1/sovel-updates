@@ -35,7 +35,7 @@ private slots:
   SettingsService service(nullptr,false);
   const auto ids=pageIds(service);
   // The Private Workspace page stays, showing only how to open or set it up.
-  QVERIFY(!ids.contains("jared"));QVERIFY(ids.contains("private"));QCOMPARE(ids.size(),29);
+  QVERIFY(!ids.contains("jared"));QVERIFY(ids.contains("private"));QCOMPARE(ids.size(),30);
   QVERIFY(!anyItemTargets(service,"jared"));QVERIFY(!anyItemTargets(service,"exit-private"));QVERIFY(!anyItemTargets(service,"vault"));
   QVERIFY(!anyItemTargets(service,"private.sealAfterLock"));QVERIFY(!anyItemTargets(service,"private-audit"));QVERIFY(!anyItemTargets(service,"preset-command"));
   QVERIFY(anyItemTargets(service,"enter-private"));QVERIFY(anyItemTargets(service,"private-setup"));
@@ -46,7 +46,7 @@ private slots:
   SovelMode::setForTesting(false);SovelMode::setAssistantForTesting(true);
   SettingsService service(nullptr,false);
   const auto ids=pageIds(service);
-  QVERIFY(ids.contains("jared"));QCOMPARE(ids.size(),30);
+  QVERIFY(ids.contains("jared"));QCOMPARE(ids.size(),31);
   QVERIFY(anyItemTargets(service,"bar.show.jared"));
   QVERIFY(!anyItemTargets(service,"exit-private"));QVERIFY(!anyItemTargets(service,"vault"));
   Backend backend;Workspace workspace(&backend,&service,false);
@@ -58,7 +58,7 @@ private slots:
   SovelMode::setForTesting(true);SovelMode::setAssistantForTesting(true);
   SettingsService service(nullptr,false);
   const auto ids=pageIds(service);
-  QVERIFY(ids.contains("jared"));QVERIFY(ids.contains("private"));QCOMPARE(ids.size(),30);
+  QVERIFY(ids.contains("jared"));QVERIFY(ids.contains("private"));QCOMPARE(ids.size(),31);
   QVERIFY(anyItemTargets(service,"exit-private"));QVERIFY(!anyItemTargets(service,"private-setup"));
   QVERIFY(service.colors()["private"].toBool());QVERIFY(!service.colors()["light"].toBool());
   QCOMPARE(service.colors()["accent"].toString(),QString("#bf40fa"));

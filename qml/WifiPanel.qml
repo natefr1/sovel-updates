@@ -28,7 +28,7 @@ ColumnLayout {
         Rectangle {
             required property var modelData
             Layout.fillWidth: true; implicitHeight: 72; radius: 13
-            color: modelData.connected ? "#405E387F" :SettingsService.colors.text; border.color:SettingsService.colors.text
+            color: modelData.connected ? Qt.tint(SettingsService.colors.surface,"#40"+String(SettingsService.colors.accent).slice(1)) : SettingsService.colors.surface; border.color: modelData.connected ? SettingsService.colors.accent : SettingsService.colors.border
             RowLayout {
                 anchors.fill: parent; anchors.margins: 13; spacing: 12
                 ConnectionGlyph { connected: modelData.connected; strength: modelData.strength; Layout.preferredWidth: 30; Layout.preferredHeight: 28 }

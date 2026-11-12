@@ -11,7 +11,7 @@ class SettingsTests:public QObject {
 private slots:
  void initTestCase(){SovelMode::setForTesting(false);SovelMode::setAssistantForTesting(false);qputenv("XDG_CONFIG_HOME",temporary.path().toUtf8());qputenv("XDG_DATA_HOME",(temporary.path()+"/data").toUtf8());}
  void canonicalNavigationAndValidPreferences(){
-  SettingsService service(nullptr,false);QCOMPARE(service.pages().size(),29); /* Normal Mode after setup: no JARED page */ QSet<QString> seen;for(auto page:service.pages()){const auto id=page.toMap()["id"].toString();QVERIFY(!id.isEmpty());QVERIFY(!seen.contains(id));seen.insert(id);}QVERIFY(service.definitions().size()>=50);
+  SettingsService service(nullptr,false);QCOMPARE(service.pages().size(),30); /* Normal Mode after setup: no JARED page */ QSet<QString> seen;for(auto page:service.pages()){const auto id=page.toMap()["id"].toString();QVERIFY(!id.isEmpty());QVERIFY(!seen.contains(id));seen.insert(id);}QVERIFY(service.definitions().size()>=50);
   QVERIFY(!service.setPreference("shell-command","rm -rf /"));QVERIFY(!service.setPreference("appearance.accent","url(file:///etc/passwd)"));QVERIFY(!service.setPreference("input.pointerSpeed",101));QVERIFY(!service.setPreference("bar.visible","yes"));
   QVERIFY(service.setPreference("appearance.mode","light"));QVERIFY(service.colors()["light"].toBool());QVERIFY(service.setPreference("appearance.mode","dark"));QVERIFY(!service.colors()["light"].toBool());
  }
